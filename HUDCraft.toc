@@ -1,0 +1,24 @@
+## Interface: 16001
+## Title: HUDCraft
+## Notes: Customizable information HUD for World of Warcraft: Forever.
+## Author: TreebeardCreative
+## Version: 0.1.1
+## Dependencies: TreebeardUI
+## SavedVariables: HUDCraftDB
+## SavedVariablesPerCharacter: HUDCraftCharDB
+
+Bootstrap.lua
+Core/Defaults.lua
+Core/Output.lua
+Modules/Bags.lua
+Modules/Clock.lua
+Modules/Experience.lua
+Modules/Level.lua
+Modules/Performance.lua
+Groups/Main.lua
+UI/Settings/Window.lua
+UI/Output/Window.lua
+Main.lua
+
+
+
