@@ -15,6 +15,6 @@ addon.Modules[#addon.Modules + 1] = {
             total = total + slots
             free = free + available
         end
-        return string.format("Bags %d/%d free", free, total)
+        return string.format("Bags %d/%d", free, total)
     end,
 }

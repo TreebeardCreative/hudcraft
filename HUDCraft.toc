@@ -2,22 +2,29 @@
 ## Title: HUDCraft
 ## Notes: Customizable information HUD for World of Warcraft: Forever.
 ## Author: TreebeardCreative
-## Version: 0.1.1
+## Version: 0.1.66
+## IconTexture: Interface\AddOns\HUDCraft\Textures\hudcraft_icon.tga
 ## Dependencies: TreebeardUI
 ## SavedVariables: HUDCraftDB
 ## SavedVariablesPerCharacter: HUDCraftCharDB
 
 Bootstrap.lua
 Core/Defaults.lua
+Core/GroupStyleOverrides.lua
 Core/Output.lua
 Modules/Bags.lua
+Modules/Character.lua
 Modules/Clock.lua
 Modules/Experience.lua
 Modules/Level.lua
 Modules/Performance.lua
+Modules/Professions.lua
+Modules/WeaponSkills.lua
+Groups/Renderer.lua
+Groups/Details.lua
 Groups/Main.lua
 UI/Settings/Window.lua
-UI/Output/Window.lua
+UI/MinimapButton.lua
 Main.lua
 
 

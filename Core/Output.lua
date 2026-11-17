@@ -7,8 +7,16 @@ function addon:AppendOutput(message)
     if #self.outputLines > 100 then
         table.remove(self.outputLines, 1)
     end
-    if self.RefreshOutput then
-        self:RefreshOutput()
+end
+
+function addon:PrintOutput()
+    if #self.outputLines == 0 then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffd8b24ahudcraft|r: No diagnostic output is available.")
+        return
+    end
+    local firstLine = math.max(1, #self.outputLines - 29)
+    for index = firstLine, #self.outputLines do
+        DEFAULT_CHAT_FRAME:AddMessage("|cffd8b24ahudcraft|r " .. self.outputLines[index])
     end
 end
 

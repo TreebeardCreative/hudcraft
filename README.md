@@ -1,36 +1,43 @@
 # hudcraft
 
-hudcraft is a lightweight, customizable information HUD for World of Warcraft: Forever. It works alongside the player's existing interface and is intended to provide compact information groups and individual HUD displays without replacing the rest of the UI.
+hudcraft is a compact information HUD for World of Warcraft Forever. It shows selected character and game information in movable groups, so you can keep useful details visible alongside the rest of your interface.
 
-## Development status
+## What you can do
 
-Version `0.1.1` is the first tracked foundation for the ground-up Forever rebuild. It uses the current Forever addon base and is an early development build, not a public release. The rebuild is catching up with the established behavior of hudcraft `1.0.0`; the planned first complete release of this line is `1.1.0` after that scope is restored and the new improvements are ready.
+- Choose which information appears in each group and arrange it horizontally or vertically.
+- Set the clock module to show local time or realm time.
+- Move, minimize, and lock groups.
+- Choose a visual style and adjust group colors.
+- Hover supported module labels to see extra details; right-click them for quick settings actions.
+- Configure tracked weapon skills and professions for each character.
 
-## Project direction
+Available information includes character level, experience, bags, clock, performance, professions, and weapon skills.
 
-The intended addon lets players create, name, arrange, and position compact HUD groups, choose the information each group displays, and configure horizontal or vertical layouts, module order, separators, and text alignment. Planned information includes character level and class, experience, gold, bag space, durability, clock, performance, weapon skills, and professions. Groups and settings remain focused on information display and configuration; hudcraft is not a full UI replacement.
+## Install
 
-The current foundation includes the addon bootstrap, saved-setting defaults, output and settings windows, a group display, and initial Bags, Clock, Experience, Level, and Performance modules. These source files mark the starting implementation; their presence does not mean the full intended feature set is complete.
+hudcraft requires TreebeardUI.
 
-## TreebeardUI
+1. Install a compatible WoW Forever release of TreebeardUI.
+2. Extract the `HUDCraft` folder into the client's `Interface/AddOns` folder.
+3. Enable both addons at the character selection screen and enter the game.
 
-This build uses TreebeardUI as a separate addon dependency (API 1) for reusable windows, controls, and layout. hudcraft owns its HUD content, setting meanings, saved values, actions, and appearance choices. TreebeardUI is not embedded in this repository.
+This repository contains the rebuilt hudcraft version. For a stable installation, use a published release when one is available; development builds can change between versions. hudcraft is developed for WoW Forever. Retail support and Retail releases are not provided.
 
-## Repository layout
+## Get started
 
-```text
-HUDCraft.toc                 Forever manifest and addon load order
-Bootstrap.lua                Addon namespace and TreebeardUI compatibility check
-Main.lua                     Initialization, saved settings, and commands
-Core/                        Defaults and output behavior
-Groups/                      HUD group construction and layout
-Modules/                     Information providers
-UI/Settings/                 Settings window
-UI/Output/                   Diagnostic output window
-```
+- Type `/hudcraft` to open Settings.
+- Click the minimap icon to open Settings, or drag it to reposition it. Use `/hudcraft minimap` to show or hide the icon.
+- In **Groups**, create or select a group, choose its modules, and arrange their order and orientation.
+- In **Main → Global Styles**, choose the settings and group appearance.
+- In **Main → Global Styles → Groups**, choose whether the clock shows local or realm time.
+- In **Groups → Module Settings**, choose which weapon skills and professions to display.
+- Hover an interactive module label in a HUD group to view its extra details. Right-click it for related settings actions.
 
-The game installs the addon in a folder named `HUDCraft`. Development and public-facing branding use lowercase `hudcraft`.
+## Commands
 
-## License
+- `/hudcraft` — Open or close Settings.
+- `/hudcraft minimap` — Show or hide the minimap button.
+- `/hudcraft commands` — List available commands.
+- `/hudcraft debug` — Print installed addon and client details.
 
-This project is available under the MIT License. See [LICENSE](LICENSE).
+When reporting a problem, include the hudcraft version, game client version, and the steps that led to it.
