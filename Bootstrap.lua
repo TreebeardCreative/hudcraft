@@ -1,16 +1,25 @@
 local addonName, addon = ...
 
 addon.name = addonName
-addon.version = "0.1.125"
+addon.version = "2.0"
 addon.requiredTreebeardUIAPI = 1
-addon.requiredTreebeardUIVersion = "0.2.50"
+addon.requiredTreebeardUIVersion = "1.0"
 
 local function VersionAtLeast(version, required)
-    local versionMajor, versionMinor, versionPatch = tostring(version or ""):match("^(%d+)%.(%d+)%.(%d+)$")
-    local requiredMajor, requiredMinor, requiredPatch = tostring(required or ""):match("^(%d+)%.(%d+)%.(%d+)$")
-    if not versionMajor or not requiredMajor then return false end
-    local actual = { tonumber(versionMajor), tonumber(versionMinor), tonumber(versionPatch) }
-    local minimum = { tonumber(requiredMajor), tonumber(requiredMinor), tonumber(requiredPatch) }
+    local function ParseVersion(value)
+        value = tostring(value or "")
+        local major, minor, patch = value:match("^(%d+)%.(%d+)%.(%d+)$")
+        if not major then
+            major, minor = value:match("^(%d+)%.(%d+)$")
+            patch = "0"
+        end
+        if not major then return nil end
+        return { tonumber(major), tonumber(minor), tonumber(patch) }
+    end
+
+    local actual = ParseVersion(version)
+    local minimum = ParseVersion(required)
+    if not actual or not minimum then return false end
     for index = 1, 3 do
         if actual[index] ~= minimum[index] then return actual[index] > minimum[index] end
     end
@@ -51,7 +60,7 @@ if not addon.libraryCompatible then
     addon.UI = nil
     local message
     if type(library) == "table" and library.API_VERSION == addon.requiredTreebeardUIAPI then
-            message = "hudcraft requires TreebeardUI 0.2.50 or newer for current framework helpers. Update TreebeardUI. Addon UI disabled."
+            message = "hudcraft requires TreebeardUI 1.0 or newer for current framework helpers. Update TreebeardUI. Addon UI disabled."
     else
         message = string.format(
             "hudcraft requires TreebeardUI API %s; installed API %s. Addon UI disabled.",

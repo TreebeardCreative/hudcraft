@@ -1,46 +1,26 @@
 # hudcraft
 
-hudcraft is a compact information HUD for World of Warcraft Forever. It shows selected character and game information in movable groups, so you can keep useful details visible alongside the rest of your interface.
+hudcraft is a customizable information HUD for World of Warcraft: Forever. Build compact, movable Groups from the character and game information you want to keep visible alongside your existing interface.
 
-## What you can do
+## Features
 
-- Choose which information appears in each group and arrange it horizontally or vertically.
-- Set the clock module to show local time or realm time.
-- Move, minimize, and lock groups.
-- Choose a visual style and adjust group colors.
-- Hover supported module labels to see extra details; right-click them for quick settings actions.
-- Configure tracked weapon skills and professions for each character.
-- Track selected factions and keep account-wide or per-character notes in standalone Notepad windows.
-
-Available information includes character level, experience, bags, clock, performance, professions, weapon skills, reputation, gold, and durability.
+- Choose modules per Group, arrange them horizontally or vertically, and set their order and separators.
+- Track character level, experience per hour, estimated time and kills to level, bags, clock, gold, durability, performance, weapon skills, professions, and reputation.
+- Open Details for supported modules, including FPS and latency, skill and faction information, experience estimates, and estimated repair cost.
+- Choose visual styles, tune Group colors, and control visibility and positions per character.
+- Create standalone account-wide or per-character Notepads.
+- Recover a misplaced Group or Notepad with `/hudcraft recover`.
 
 ## Install
 
-hudcraft requires TreebeardUI. The hudcraft package includes both addons.
-
-1. Extract the `HUDCraft` and `TreebeardUI` folders into the client's `Interface/AddOns` folder.
-2. Enable both addons at the character selection screen and enter the game.
-
-This repository contains the rebuilt hudcraft version. For a stable installation, use a published release when one is available; development builds can change between versions. hudcraft is developed for WoW Forever. Retail support and Retail releases are not provided.
+The hudcraft package includes both `HUDCraft` and its required `TreebeardUI` framework. Extract both folders into the client's `Interface/AddOns` folder, then enable both addons.
 
 ## Get started
 
-- Type `/hudcraft` to open Settings.
-- Click the minimap icon to open Settings, or drag it to reposition it. Use `/hudcraft minimap` to show or hide the icon.
-- In **Groups**, create or select a group, choose its modules, and arrange their order and orientation.
-- In **Main → Global Styles**, choose the settings and group appearance.
-- In **Main → Global Styles → Groups**, choose whether the clock shows local or realm time.
-- In **Groups → Module Settings**, choose which weapon skills and professions to display.
-- Hover an interactive module label in a HUD group to view its extra details. Right-click it for related settings actions.
+Type `/hudcraft` to open Settings. In **Groups**, choose your modules and configure each Group. Use the minimap icon for quick access, or `/hudcraft commands` to see the available commands.
 
-## Commands
+## Support
 
-- `/hudcraft` — Open or close Settings.
-- `/hudcraft settings` — Open or close Settings.
-- `/hudcraft minimap` — Show or hide the minimap button.
-- `/hudcraft commands` — List available commands.
-- `/hudcraft recover [name]` — List Groups, or center and unlock one for this character. You can also use `id:<number>` if names overlap.
+Share suggestions and bug reports in the [hudcraft Discord](https://discord.gg/q3ey4Bbqeh). When reporting a problem, include your HUDCraft version, client version, and steps to reproduce it.
 
-Notepad supports keyboard selection, copy, and paste. Mouse drag selection is not available in this release candidate.
-
-When reporting a problem, include the hudcraft version, game client version, and the steps that led to it.
+hudcraft is built for WoW Forever. Retail support and Retail releases are not provided.

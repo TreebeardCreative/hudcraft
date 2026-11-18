@@ -246,7 +246,7 @@ function addon:CreateSettingsWindow()
                 AddText(communityColumn,
                     "Join the hudcraft Discord to share suggestions, report issues, and " ..
                     "follow development.\n\n")
-                local discordUrl = "https://discord.gg/dh9UahC8w"
+                local discordUrl = "https://discord.gg/q3ey4Bbqeh"
                 local discordBrowser = {
                     OpenExternalLink = function() LaunchURL(discordUrl) end,
                     CopyExternalLink = function() CopyToClipboard(discordUrl) end,
