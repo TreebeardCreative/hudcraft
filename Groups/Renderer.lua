@@ -52,13 +52,14 @@ local function ApplyModuleHighlight(frame, module, orientation)
     end
 end
 
-local function HasValidInteraction(module)
+local function HasValidInteraction(module, showDetails)
     local interaction = module and module.interaction
     if type(interaction) == "function" then return true end
-    if type(interaction) ~= "table" then return false end
+    if type(interaction) ~= "table" then return module and module.hasSettingsPage == true or false end
     return type(interaction.onClick) == "function"
         or type(interaction.onRightClick) == "function"
-        or type(interaction.getDetails) == "function"
+        or module.hasSettingsPage == true
+        or (showDetails == true and type(interaction.getDetails) == "function")
 end
 
 local function MeasureText(fontString)
@@ -146,6 +147,7 @@ function Renderer:Create(parent, options)
     local renderer = setmetatable({}, self)
     renderer.parent = parent
     renderer.options = {
+        groupId = options.groupId,
         orientation = options.orientation == "column" and "column" or "row",
         padding = math.max(0, tonumber(options.padding) or DEFAULTS.padding),
         horizontalGap = math.max(0, tonumber(options.horizontalGap or options.gap) or DEFAULTS.horizontalGap),
@@ -201,7 +203,7 @@ function Renderer:SetItems(items, options)
     self.nodes = {}
 
     for index, item in ipairs(items or {}) do
-        local interactive = HasValidInteraction(item.module)
+        local interactive = HasValidInteraction(item.module, item.showDetails == true)
         local module = item.module
         local visual = CreateVisual(self.parent, self.options, interactive)
         local entry = {
@@ -218,7 +220,7 @@ function Renderer:SetItems(items, options)
             visual:SetScript("OnClick", function(frame, button)
                 local interaction = module and module.interaction
                 if button == "RightButton" and addon.ShowModuleContextMenu then
-                    addon:ShowModuleContextMenu(module, frame)
+                    addon:ShowModuleContextMenu(module, frame, self.options.groupId)
                 elseif button == "LeftButton" then
                     local action = type(interaction) == "function" and interaction
                         or type(interaction) == "table" and interaction.onClick

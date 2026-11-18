@@ -10,16 +10,16 @@ hudcraft is a compact information HUD for World of Warcraft Forever. It shows se
 - Choose a visual style and adjust group colors.
 - Hover supported module labels to see extra details; right-click them for quick settings actions.
 - Configure tracked weapon skills and professions for each character.
+- Track selected factions and keep account-wide or per-character notes in standalone Notepad windows.
 
-Available information includes character level, experience, bags, clock, performance, professions, and weapon skills.
+Available information includes character level, experience, bags, clock, performance, professions, weapon skills, reputation, gold, and durability.
 
 ## Install
 
-hudcraft requires TreebeardUI.
+hudcraft requires TreebeardUI. The hudcraft package includes both addons.
 
-1. Install a compatible WoW Forever release of TreebeardUI.
-2. Extract the `HUDCraft` folder into the client's `Interface/AddOns` folder.
-3. Enable both addons at the character selection screen and enter the game.
+1. Extract the `HUDCraft` and `TreebeardUI` folders into the client's `Interface/AddOns` folder.
+2. Enable both addons at the character selection screen and enter the game.
 
 This repository contains the rebuilt hudcraft version. For a stable installation, use a published release when one is available; development builds can change between versions. hudcraft is developed for WoW Forever. Retail support and Retail releases are not provided.
 
@@ -36,8 +36,11 @@ This repository contains the rebuilt hudcraft version. For a stable installation
 ## Commands
 
 - `/hudcraft` — Open or close Settings.
+- `/hudcraft settings` — Open or close Settings.
 - `/hudcraft minimap` — Show or hide the minimap button.
 - `/hudcraft commands` — List available commands.
-- `/hudcraft debug` — Print installed addon and client details.
+- `/hudcraft recover [name]` — List Groups, or center and unlock one for this character. You can also use `id:<number>` if names overlap.
+
+Notepad supports keyboard selection, copy, and paste. Mouse drag selection is not available in this release candidate.
 
 When reporting a problem, include the hudcraft version, game client version, and the steps that led to it.

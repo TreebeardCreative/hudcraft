@@ -4,10 +4,8 @@ addon.commandHelpLines = {
     "/hudcraft - Toggle the Settings window.",
     "/hudcraft settings - Toggle the Settings window.",
     "/hudcraft minimap - Show or hide the minimap button.",
-    "/hudcraft debug - Print recent diagnostic output.",
     "/hudcraft commands - List available commands.",
-    "/hudcraft groups-debug - Print Group Management data and frame layout.",
-    "/hudcraft group-position [name|id] - Print saved and live Group frame position data.",
+    "/hudcraft recover [name] - List Groups or center and unlock one for this character.",
 }
 
 function addon:Initialize()
@@ -179,6 +177,21 @@ function addon:Initialize()
             orderedGroupIds[groupId] = true
         end
     end
+    -- Account-wide Group definitions are authoritative. Recover any definition
+    -- omitted from a stale order array so it is included in settings navigation
+    -- on every character, including account-wide and per-character Notepads.
+    local unorderedGroupIds = {}
+    for groupId, group in pairs(savedGroups) do
+        if type(groupId) == "number" and groupId > 0 and groupId == math.floor(groupId)
+            and type(group) == "table" and not orderedGroupIds[groupId] then
+            unorderedGroupIds[#unorderedGroupIds + 1] = groupId
+        end
+    end
+    table.sort(unorderedGroupIds)
+    for _, groupId in ipairs(unorderedGroupIds) do
+        orderedGroups[#orderedGroups + 1] = groupId
+        orderedGroupIds[groupId] = true
+    end
     HUDCraftDB.groups.order = orderedGroups
     local maxGroupId = 0
     for groupId in pairs(savedGroups) do
@@ -194,6 +207,8 @@ function addon:Initialize()
     HUDCraftCharDB = type(HUDCraftCharDB) == "table" and HUDCraftCharDB or {}
     HUDCraftCharDB.moduleSettings = type(HUDCraftCharDB.moduleSettings) == "table"
         and HUDCraftCharDB.moduleSettings or {}
+    HUDCraftCharDB.notepadTexts = type(HUDCraftCharDB.notepadTexts) == "table"
+        and HUDCraftCharDB.notepadTexts or {}
     HUDCraftCharDB.moduleLabels = type(HUDCraftCharDB.moduleLabels) == "table"
         and HUDCraftCharDB.moduleLabels or {}
     for _, moduleId in ipairs({ "weaponSkills", "professions" }) do
@@ -205,6 +220,23 @@ function addon:Initialize()
                     HUDCraftCharDB.moduleLabels[moduleId] = labels[moduleId]
                     break
                 end
+            end
+        end
+    end
+    -- A legacy single Notepad was character-specific. Keep that text intact
+    -- while making the scope explicit for the multi-Notepad model.
+    for _, groupId in ipairs(HUDCraftDB.groups.order or {}) do
+        local group = HUDCraftDB.groups.byId[groupId]
+        if type(group) == "table" and group.kind == "notepad" then
+            group.editable = true
+            if group.noteScope ~= "account" and group.noteScope ~= "character" then
+                group.noteScope = "character"
+            end
+            if group.noteScope == "account" then
+                if type(group.noteText) ~= "string" then group.noteText = "" end
+                HUDCraftCharDB.notepadTexts[groupId] = nil
+            elseif type(HUDCraftCharDB.notepadTexts[groupId]) ~= "string" then
+                HUDCraftCharDB.notepadTexts[groupId] = ""
             end
         end
     end
@@ -230,7 +262,7 @@ function addon:Initialize()
     HUDCraftCharDB.groupsEnabled = type(HUDCraftCharDB.groupsEnabled) == "table"
         and HUDCraftCharDB.groupsEnabled or {}
     if next(groupIdMigration) then
-        for _, stateKey in ipairs({ "windowPositions", "windowCollapsed", "windowSizes", "frameHeaderPositions", "groupsEnabled" }) do
+        for _, stateKey in ipairs({ "windowPositions", "windowCollapsed", "windowSizes", "frameHeaderPositions", "groupsEnabled", "notepadTexts" }) do
             local state = HUDCraftCharDB[stateKey]
             local remapped = {}
             for oldId, value in pairs(state) do
@@ -262,6 +294,14 @@ function addon:Initialize()
     for groupId in pairs(HUDCraftCharDB.groupsEnabled) do
         if not savedGroups[groupId] then HUDCraftCharDB.groupsEnabled[groupId] = nil end
     end
+    for groupId in pairs(HUDCraftCharDB.notepadTexts) do
+        local group = savedGroups[groupId]
+        if type(group) ~= "table" or group.kind ~= "notepad" then
+            HUDCraftCharDB.notepadTexts[groupId] = nil
+        elseif type(HUDCraftCharDB.notepadTexts[groupId]) ~= "string" then
+            HUDCraftCharDB.notepadTexts[groupId] = ""
+        end
+    end
     for _, stateKey in ipairs({ "windowPositions", "windowCollapsed", "windowSizes", "frameHeaderPositions" }) do
         local state = HUDCraftCharDB[stateKey]
         for groupId in pairs(state) do
@@ -277,11 +317,19 @@ function addon:Initialize()
             break
         end
     end
-    for index, groupId in ipairs(HUDCraftDB.groups.order) do
+    local defaultVisibleGroupAssigned = false
+    for _, groupId in ipairs(HUDCraftDB.groups.order) do
+        local group = savedGroups[groupId]
         if not hasSavedGroupVisibility then
-            HUDCraftCharDB.groupsEnabled[groupId] = index == 1
+            local visibleByDefault = not defaultVisibleGroupAssigned
+                and not (group and group.kind == "notepad")
+            HUDCraftCharDB.groupsEnabled[groupId] = visibleByDefault
+            if visibleByDefault then defaultVisibleGroupAssigned = true end
         elseif type(HUDCraftCharDB.groupsEnabled[groupId]) ~= "boolean" then
-            HUDCraftCharDB.groupsEnabled[groupId] = true
+            -- Groups are account-wide definitions, but a missing character
+            -- preference means this character has not opted into the Group.
+            -- Creation explicitly enables it on the creating character.
+            HUDCraftCharDB.groupsEnabled[groupId] = false
         end
     end
 
@@ -367,6 +415,7 @@ function addon:Initialize()
 
     self:CreateMainGroup()
     self:CreateSettingsWindow()
+    self:CreateAddonOptionsPanel()
     self:CreateMinimapButton()
     self.initialized = true
     self:Log("Loaded hudcraft " .. self.version .. " with TreebeardUI API " .. tostring(self.requiredTreebeardUIAPI))
@@ -384,24 +433,10 @@ end)
 SLASH_HUDCRAFT1 = "/hudcraft"
 SlashCmdList.HUDCRAFT = function(message)
     local command = string.lower(tostring(message or "")):match("^%s*(.-)%s*$")
-    if command == "debug" then
-        addon:PrintOutput()
-    elseif command == "groups-debug" then
-        if type(addon.GetGroupManagementDiagnostics) ~= "function" then
-            DEFAULT_CHAT_FRAME:AddMessage("hudcraft: Group Management diagnostics are unavailable; reload the diagnostic build.")
-        else
-            for _, line in ipairs(addon:GetGroupManagementDiagnostics()) do
-                DEFAULT_CHAT_FRAME:AddMessage("|cffd8b24ahudcraft|r " .. line)
-            end
-        end
-    elseif command:match("^group%-position") then
-        local filter = command:match("^group%-position%s*(.-)%s*$") or ""
-        if type(addon.GetGroupPositionDiagnostics) ~= "function" then
-            DEFAULT_CHAT_FRAME:AddMessage("hudcraft: Group position diagnostics are unavailable; reload the diagnostic build.")
-        else
-            for _, line in ipairs(addon:GetGroupPositionDiagnostics(filter)) do
-                DEFAULT_CHAT_FRAME:AddMessage("|cffd8b24ahudcraft|r " .. line)
-            end
+    if command == "recover" or command:match("^recover%s+") then
+        local query = command:match("^recover%s*(.-)%s*$") or ""
+        for _, line in ipairs(addon:RecoverGroup(query)) do
+            DEFAULT_CHAT_FRAME:AddMessage("|cffd8b24ahudcraft|r " .. line)
         end
     elseif command == "commands" then
         for _, line in ipairs(addon.commandHelpLines) do
@@ -413,6 +448,6 @@ SlashCmdList.HUDCRAFT = function(message)
     elseif command == "" or command == "settings" then
         addon:ToggleSettings()
     else
-        print("hudcraft: /hudcraft [settings|minimap|debug|commands|groups-debug|group-position]")
+        print("hudcraft: /hudcraft [settings|minimap|commands|recover]")
     end
 end

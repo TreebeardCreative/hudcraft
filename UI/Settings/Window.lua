@@ -60,7 +60,7 @@ function addon:CreateSettingsWindow()
     ui.WindowStyles:SetConsumerPreset(self.name, HUDCraftDB.styles.settings)
     local window = ui.WindowFrame:Create({
         id = "settings",
-        title = "hudcraft — Settings",
+        title = "hudcraft",
         owner = self.name,
         sizing = {
             initial = { width = 620, height = 440 },
@@ -71,6 +71,21 @@ function addon:CreateSettingsWindow()
         frameHeader = { controls = { close = true, minimize = true } },
     })
     self.settingsWindow = window
+
+    local escapeFrameName = "HUDCraftSettingsWindow"
+    _G[escapeFrameName] = window
+    if type(UISpecialFrames) == "table" then
+        local alreadyRegistered = false
+        for _, registeredName in ipairs(UISpecialFrames) do
+            if registeredName == escapeFrameName then
+                alreadyRegistered = true
+                break
+            end
+        end
+        if not alreadyRegistered then
+            UISpecialFrames[#UISpecialFrames + 1] = escapeFrameName
+        end
+    end
 
     local mainNavigation = CreateFrame("Frame", nil, window.content)
     mainNavigation:SetPoint("TOPLEFT", window.content, "TOPLEFT", 0, 0)
@@ -83,7 +98,7 @@ function addon:CreateSettingsWindow()
     subpageNavigation:SetHeight(subpageHeight)
 
     local pageArea = CreateFrame("Frame", nil, window.content)
-    pageArea:SetPoint("TOPLEFT", subpageNavigation, "BOTTOMLEFT", 0, 0)
+    pageArea:SetPoint("TOPLEFT", subpageNavigation, "BOTTOMLEFT", 0, -2)
     pageArea:SetPoint("BOTTOMRIGHT", window.content, "BOTTOMRIGHT", 0, 0)
 
     local mainButtons, subpageButtons, pageFrames = {}, {}, {}
@@ -191,32 +206,46 @@ function addon:CreateSettingsWindow()
                     return section
                 end
 
-                local addonInfo = NewSection("addon-information", "Addon Information",
+                local addonInfo = NewSection("addon-information", "Addon Information")
+                AddText(addonInfo,
                     "hudcraft is a lightweight information HUD for WoW Forever. It works " ..
                     "alongside your existing interface, focusing on useful information " ..
-                    "without replacing your UI. Developed by TreebeardCreative.")
+                    "without replacing your UI.\n\n", false)
+                local brushfire = ui.WindowStyles.Presets["Brushfire"]
+                local authorColor = brushfire
+                    and ui.WindowStyles:ResolveColor("interactionAccent_4", brushfire)
+                if type(authorColor) == "table" then
+                    local red = math.floor((tonumber(authorColor[1]) or 1) * 255 + 0.5)
+                    local green = math.floor((tonumber(authorColor[2]) or 0) * 255 + 0.5)
+                    local blue = math.floor((tonumber(authorColor[3]) or 0) * 255 + 0.5)
+                    AddText(addonInfo, string.format("Developed by |cff%02x%02x%02xTreebeardCreative|r.\n\n",
+                        red, green, blue), false)
+                else
+                    AddText(addonInfo, "Developed by TreebeardCreative.\n\n", false)
+                end
 
                 local settingsColumn, groupsColumn = AddTwoColumns(addonInfo,
                     "addon-information-row", "settings-characters", "groups-modules")
                 AddHeader(settingsColumn, "Settings and Characters")
                 AddText(settingsColumn,
-                    "Group definitions are shared across your account. Group visibility and " ..
-                    "positions are saved for each character.")
+                    "Group definitions are shared across your account. Visibility and " ..
+                    "positions are saved per character. Notepads can keep text account-wide " ..
+                    "or per character.\n\n")
                 AddHeader(groupsColumn, "Groups and Modules")
                 AddText(groupsColumn,
-                    "Groups are compact HUD displays for selected information. Group and " ..
-                    "module settings are being rebuilt for this version.")
+                    "Groups are compact HUD displays for selected information. Choose " ..
+                    "modules, arrange their order, and set each Group's layout and behavior.\n\n")
 
                 local feedbackColumn, communityColumn = AddTwoColumns(addonInfo,
                     "support-row", "feedback-bugs", "community")
                 AddHeader(feedbackColumn, "Feedback and Bugs")
                 AddText(feedbackColumn,
                     "If something looks wrong or behaves unexpectedly, report what you were " ..
-                    "doing and what you expected to happen.")
+                    "doing and what you expected to happen.\n\n")
                 AddHeader(communityColumn, "Community")
                 AddText(communityColumn,
                     "Join the hudcraft Discord to share suggestions, report issues, and " ..
-                    "follow development.")
+                    "follow development.\n\n")
                 local discordUrl = "https://discord.gg/dh9UahC8w"
                 local discordBrowser = {
                     OpenExternalLink = function() LaunchURL(discordUrl) end,
@@ -416,9 +445,7 @@ function addon:CreateSettingsWindow()
                     if not base then return colorFactory.ToHex(colorFactory.white) end
                     local value
                     if key == "text" then
-                        local slotName = base and base.textColorRoleMap
-                            and base.textColorRoleMap.primary or "textMainColor"
-                        value = styles:ResolveColor(base[slotName], base)
+                        value = styles:ResolveColor(base.textInteractionAccentColor, base)
                     elseif key == "border" then
                         value = styles:GetWindowBorderColor(base)
                     elseif key == "interaction" then
@@ -456,7 +483,7 @@ function addon:CreateSettingsWindow()
                 for value = 0, 100, 5 do opacityValues[#opacityValues + 1] = value end
                 local function FormatOpacity(value) return tostring(value) .. "%" end
                 local overrideRows = {
-                    { key = "text", colorLabel = "Text color", opacityLabel = "Text opacity" },
+                    { key = "text", colorLabel = "Group text color", opacityLabel = "Group text opacity" },
                     { key = "border", colorLabel = "Border color", opacityLabel = "Border opacity" },
                     { key = "interaction", colorLabel = "Interaction color", opacityLabel = "Interaction opacity" },
                     { key = "background", colorLabel = "Background color", opacityLabel = "Background opacity" },
@@ -520,23 +547,59 @@ function addon:CreateSettingsWindow()
                     border = false,
                 })
                 layout:AddContent(managementPanel, actionsSection, { fillWidth = true })
+                local notepadsSection = layout:Section(managementPanel, "hudcraft-notepad-creation-list", {
+                    border = false,
+                })
+                layout:AddContent(managementPanel, notepadsSection, { fillWidth = true })
+                local notepadActionsSection = layout:Section(managementPanel, "hudcraft-notepad-creation-actions", {
+                    border = false,
+                })
+                layout:AddContent(managementPanel, notepadActionsSection, { fillWidth = true })
+                layout:AreaHeader(groupsSection, "Groups")
+                layout:AreaHeader(notepadsSection, "Notepads")
                 local groupRows, groupInputs = {}, {}
+                local notepadRows, notepadInputs = {}, {}
 
                 local function CreateGroupRow(groupId, group)
-                    local row = layout:Row(groupsSection, "hudcraft-group-row-" .. tostring(groupId), {
+                    local isNotepad = group.kind == "notepad"
+                    local parent = isNotepad and notepadsSection or groupsSection
+                    local row = layout:Row(parent, (isNotepad and "hudcraft-notepad-row-" or "hudcraft-group-row-") .. tostring(groupId), {
                         flow = true,
                     })
-                    local entryColumns = layout:Columns(row, 2, {
-                        "group-name-" .. tostring(groupId),
-                        "group-delete-" .. tostring(groupId),
-                    }, {
-                        widths = { nil, 22 },
-                        horizontalAlignments = { "LEFT", "CENTER" },
-                        verticalAlignments = { "CENTER", "CENTER" },
-                        minHeights = { 24, 18 },
+                    local scopeLabel = isNotepad
+                        and (group.noteScope == "account" and "[Account-Wide]" or "[Per-Character]") or ""
+                    local scopeText
+                    local columnIds, widths, horizontalAlignments, verticalAlignments, minHeights
+                    if isNotepad then
+                        scopeText = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+                        scopeText:SetJustifyH("LEFT")
+                        scopeText:SetText(scopeLabel)
+                        columnIds = { "notepad-scope-" .. tostring(groupId),
+                            "notepad-name-" .. tostring(groupId), "notepad-delete-" .. tostring(groupId) }
+                        widths = { math.max(1, math.ceil(scopeText:GetStringWidth() or 1)), nil, 22 }
+                        horizontalAlignments = { "LEFT", "LEFT", "CENTER" }
+                        verticalAlignments = { "CENTER", "CENTER", "CENTER" }
+                        minHeights = { 24, 24, 24 }
+                    else
+                        columnIds = { "group-name-" .. tostring(groupId), "group-delete-" .. tostring(groupId) }
+                        widths = { nil, 22 }
+                        horizontalAlignments = { "LEFT", "CENTER" }
+                        verticalAlignments = { "CENTER", "CENTER" }
+                        minHeights = { 24, 24 }
+                    end
+                    local entryColumns = layout:Columns(row, #columnIds, columnIds, {
+                        widths = widths,
+                        horizontalAlignments = horizontalAlignments,
+                        verticalAlignments = verticalAlignments,
+                        minHeights = minHeights,
                     })
+                    local nameColumn = isNotepad and entryColumns[2] or entryColumns[1]
+                    local deleteColumn = isNotepad and entryColumns[3] or entryColumns[2]
+                    if scopeText then
+                        layout:AddContent(entryColumns[1], scopeText, { role = "notes" })
+                    end
 
-                    local nameInput = controls.AddTextInputContent(entryColumns[1], "",
+                    local nameInput = controls.AddTextInputContent(nameColumn, "",
                         function() return self:GetGroupName(groupId) end,
                         function(value)
                             local current = HUDCraftDB.groups.byId[groupId]
@@ -562,7 +625,7 @@ function addon:CreateSettingsWindow()
                         self:RenameGroupFrame(groupId)
                         if self.groupManagementRefresh then self.groupManagementRefresh() end
                     end)
-                    layout:AddContent(entryColumns[1], nameInput, { role = "text-input", fillWidth = true })
+                    layout:AddContent(nameColumn, nameInput, { role = "text-input", fillWidth = true })
 
                     local headerClose = self.settingsWindow and self.settingsWindow.closeButton
                     local iconScale = 0.75
@@ -574,13 +637,20 @@ function addon:CreateSettingsWindow()
                         glyphSize = (((headerClose and headerClose.icon
                             and headerClose.icon:GetWidth()) or 18) * iconScale),
                     }
-                    local deleteButton = ui.WindowStyles:CreateIconButton(entryColumns[2], "exit_icon", function()
+                    local deleteButton = ui.WindowStyles:CreateIconButton(deleteColumn, "exit_icon", function()
                         local current = HUDCraftDB.groups.byId[groupId]
                         if current then StaticPopup_Show("HUDCRAFT_DELETE_GROUP", current.name, nil, groupId) end
                     end, HUDCraftDB.styles.settings, iconOptions)
-                    layout:AddContent(entryColumns[2], deleteButton, { role = "button" })
-                    groupRows[groupId] = row
-                    groupInputs[groupId] = nameInput
+                    layout:AddContent(deleteColumn, deleteButton, { role = "button" })
+                    if isNotepad then
+                        notepadRows[groupId] = row
+                        nameInput.scopeLabel = scopeText
+                        nameInput.scopeLabelColumn = entryColumns[1]
+                        notepadInputs[groupId] = nameInput
+                    else
+                        groupRows[groupId] = row
+                        groupInputs[groupId] = nameInput
+                    end
                     return row
                 end
 
@@ -589,7 +659,12 @@ function addon:CreateSettingsWindow()
                 emptyGroupsText:SetText("No Groups have been added.")
                 layout:AddContent(groupsSection, emptyGroupsText, { role = "notes" })
 
-                local createGroupButton = controls.AddActionButtonContent(actionsSection,
+                local createGroupRow = layout:Row(actionsSection,
+                    "hudcraft-add-group-row", { flow = true })
+                layout:AddContent(actionsSection, createGroupRow, { fillWidth = true })
+                local createGroupColumn = layout:Columns(createGroupRow, 1,
+                    { "hudcraft-add-group-column" }, { horizontalAlign = "CENTER" })[1]
+                local createGroupButton = controls.AddActionButtonContent(createGroupColumn,
                     "Add Group", function()
                         local newId = self:CreateGroup()
                         if self.groupCreationRefresh then self.groupCreationRefresh() end
@@ -600,24 +675,68 @@ function addon:CreateSettingsWindow()
                             input.editBox:HighlightText()
                         end
                     end, { widthMode = "auto" })
-                layout:AddContent(actionsSection, createGroupButton, { role = "button" })
+                layout:AddContent(createGroupColumn, createGroupButton, {
+                    role = "button",
+                    fillWidth = false,
+                })
+
+                local notepadButtonRow = layout:Row(notepadActionsSection,
+                    "hudcraft-add-notepad-buttons", { flow = true })
+                layout:AddContent(notepadActionsSection, notepadButtonRow, { fillWidth = true })
+                local notepadButtonColumns = layout:Columns(notepadButtonRow, 2, {
+                    "hudcraft-add-account-notepad-column",
+                    "hudcraft-add-character-notepad-column",
+                }, { horizontalAlign = "CENTER" })
+                local function AddNotepadButton(parent, label, scope)
+                    local button = controls.AddActionButtonContent(parent, label, function()
+                        local newId = self:CreateNotepad(scope)
+                        if self.groupCreationRefresh then self.groupCreationRefresh() end
+                        if self.groupManagementRefresh then self.groupManagementRefresh() end
+                        local input = newId and notepadInputs[newId]
+                        if input and input.editBox then
+                            input.editBox:SetFocus()
+                            input.editBox:HighlightText()
+                        end
+                    end, { widthMode = "auto" })
+                    layout:AddContent(parent, button, { role = "button", fillWidth = false })
+                    return button
+                end
+                AddNotepadButton(notepadButtonColumns[1],
+                    "Add Account-Wide Notepad", "account")
+                AddNotepadButton(notepadButtonColumns[2],
+                    "Add Per-Character Notepad", "character")
 
                 local function RefreshGroupCreation()
                     local order = HUDCraftDB.groups.order or {}
                     local present = {}
+                    local groupCount = 0
                     for _, groupId in ipairs(order) do
                         local group = HUDCraftDB.groups.byId[groupId]
                         if group then
                             present[groupId] = true
-                            local row = groupRows[groupId] or CreateGroupRow(groupId, group)
-                            row:Show()
-                            if groupInputs[groupId] then groupInputs[groupId]:Refresh() end
+                            if group.kind == "notepad" then
+                                local notepadRow = notepadRows[groupId] or CreateGroupRow(groupId, group)
+                                notepadRow:Show()
+                                if notepadInputs[groupId] then
+                                    notepadInputs[groupId].scopeLabel:SetText(group.noteScope == "account"
+                                        and "[Account-Wide]" or "[Per-Character]")
+                                    notepadInputs[groupId]:Refresh()
+                                end
+                            else
+                                groupCount = groupCount + 1
+                                local row = groupRows[groupId] or CreateGroupRow(groupId, group)
+                                row:Show()
+                                if groupInputs[groupId] then groupInputs[groupId]:Refresh() end
+                            end
                         end
                     end
                     for groupId, row in pairs(groupRows) do
                         if not present[groupId] then row:Hide() end
                     end
-                    emptyGroupsText:SetShown(#order == 0)
+                    for groupId, row in pairs(notepadRows) do
+                        if not present[groupId] then row:Hide() end
+                    end
+                    emptyGroupsText:SetShown(groupCount == 0)
                     if host.ScheduleMeasure then host.ScheduleMeasure() end
                 end
                 self.groupCreationRefresh = RefreshGroupCreation
@@ -632,22 +751,104 @@ function addon:CreateSettingsWindow()
                 local sidebarContentGap = metrics.SECTION_PADDING
                 local sidebarHost = CreateFrame("Frame", nil, content)
                 sidebarHost:SetAllPoints(content)
-
+                local scroll
                 local host, flow = CreateHostedPage(ui, content, layout, "hudcraft-group-management")
-                local scroll, pageContent, scrollbar = host.scroll, host.content, host.scrollbar
+                scroll = host.scroll
+                local pageContent = host.content
                 flow.layoutHorizontalAlign = "CENTER"
+                local sidebarColumn = CreateFrame("Frame", nil, sidebarHost)
+                sidebarColumn:SetPoint("TOPLEFT", sidebarHost, "TOPLEFT", 0, 0)
+                sidebarColumn:SetPoint("BOTTOMLEFT", sidebarHost, "BOTTOMLEFT", 0, 0)
+                local sidebarViewport = CreateFrame("ScrollFrame", nil, sidebarColumn)
+                sidebarViewport:EnableMouseWheel(true)
+                sidebarViewport:SetClipsChildren(true)
+                sidebarViewport:SetPoint("TOPLEFT", sidebarColumn, "TOPLEFT", 0, 0)
+                sidebarViewport:SetPoint("BOTTOMLEFT", sidebarColumn, "BOTTOMLEFT", 0, 0)
+                sidebarViewport:SetWidth(15)
+                local sidebarScrollContent = CreateFrame("Frame", nil, sidebarViewport)
+                sidebarScrollContent:SetSize(15, 1)
+                sidebarViewport:SetScrollChild(sidebarScrollContent)
+                local sidebarScrollbar = controls.AttachScrollbar
+                    and controls:AttachScrollbar(sidebarHost, sidebarViewport, "inherit", { variant = "slim" })
+                local sidebarDivider = ui.WindowStyles:CreateFlatTexture(sidebarHost, "BORDER",
+                    ui.WindowStyles:GetSubpageUnderlineColor(content))
+                if sidebarDivider then
+                    sidebarDivider:SetWidth(1)
+                    sidebarDivider:SetPoint("TOPRIGHT", sidebarColumn, "TOPRIGHT", 0, 0)
+                    sidebarDivider:SetPoint("BOTTOMRIGHT", sidebarColumn, "BOTTOMRIGHT", 0, 0)
+                    ui.WindowStyles:RegisterVisual(sidebarDivider, function(target)
+                        target:SetVertexColor(unpack(ui.WindowStyles:GetSubpageUnderlineColor(content)))
+                    end)
+                end
                 local managementPanel = layout:Container(flow, "hudcraft-group-settings-panel")
                 layout:AddContent(flow, managementPanel, { fillWidth = true, maxWidth = 1000 })
 
                 local emptyGroupsText = layout:Note(managementPanel,
-                    "Create a Group on the Group Creation page to configure it.", {
+                    "Create a Group or Notepad on the Group Creation page to configure it.", {
                         justifyH = "LEFT",
                     })
                 layout:AddContent(managementPanel, emptyGroupsText, { fillWidth = true, wrap = true })
 
                 local entries, selectedGroupId = {}, nil
                 local RefreshGroupManagement
-                local navigation, navigationOrderSignature
+                local navigation, notepadNavigation, notepadNavigationHeader
+                local navigationOrderSignature
+                local navigationContentHeight = 0
+                local function ApplySidebarWidthLimit()
+                    local scrollbarGutter = controls.GetScrollbarGutterWidth
+                        and controls:GetScrollbarGutterWidth("slim") or 12
+                    local dividerClearance = 4
+                    local maximumWidth = math.max(15,
+                        (window:GetWidth() or 1) * 0.30 - scrollbarGutter - dividerClearance)
+                    if navigation then navigation:SetMaxWidth(maximumWidth) end
+                    if notepadNavigation then notepadNavigation:SetMaxWidth(maximumWidth) end
+                    local sharedWidth = navigation and (navigation:GetWidth() or 15) or 15
+                    if notepadNavigation then
+                        sharedWidth = math.max(sharedWidth, notepadNavigation:GetWidth() or 15)
+                    end
+                    if navigation then navigation:SetDisplayWidth(sharedWidth) end
+                    if notepadNavigation then notepadNavigation:SetDisplayWidth(sharedWidth) end
+                    local railWidth = navigation and (navigation:GetWidth() or 15) or 15
+                    sidebarViewport:SetWidth(railWidth)
+                    sidebarScrollContent:SetWidth(railWidth)
+                    -- Flush scroll-child bounds before the lower Notepad rail is queried or painted.
+                    sidebarViewport:UpdateScrollChildRect()
+                    sidebarColumn:SetWidth(railWidth + scrollbarGutter)
+                    if sidebarDivider then
+                        sidebarDivider:ClearAllPoints()
+                        sidebarDivider:SetPoint("TOPLEFT", sidebarViewport, "TOPRIGHT",
+                            scrollbarGutter + dividerClearance, 0)
+                        sidebarDivider:SetPoint("BOTTOMLEFT", sidebarColumn, "BOTTOMRIGHT",
+                            dividerClearance, 0)
+                    end
+                    scroll:ClearAllPoints()
+                    scroll:SetPoint("TOPLEFT", sidebarColumn, "TOPRIGHT", sidebarContentGap, 0)
+                    scroll:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT",
+                        -(tonumber(controls.ScrollbarGutterWidth) or 12), 0)
+                    if sidebarScrollbar and sidebarScrollbar.RefreshVisibility then
+                        sidebarScrollbar:RefreshVisibility()
+                    end
+                end
+
+                local function ScrollSidebar(_, delta)
+                    local current = sidebarViewport:GetVerticalScroll() or 0
+                    local range = sidebarViewport:GetVerticalScrollRange() or 0
+                    sidebarViewport:SetVerticalScroll(math.max(0, math.min(range, current - delta * 35)))
+                    if sidebarScrollbar and sidebarScrollbar.Update then sidebarScrollbar:Update() end
+                end
+                sidebarViewport:SetScript("OnMouseWheel", ScrollSidebar)
+                local function EnableSidebarWheel(region)
+                    if not region or not region.EnableMouseWheel then return end
+                    region:EnableMouseWheel(true)
+                    region:SetScript("OnMouseWheel", ScrollSidebar)
+                end
+                local function ClearNavigationSelection(target)
+                    if not target then return end
+                    target.selectedIndex = nil
+                    for _, button in ipairs(target.buttons or {}) do
+                        button:SetSelected(false)
+                    end
+                end
                 local moduleOptions, moduleById = {}, {}
                 for _, module in ipairs(self.Modules or {}) do
                     moduleById[module.id] = module
@@ -672,6 +873,11 @@ function addon:CreateSettingsWindow()
                 local function SelectGroup(groupId)
                     selectedGroupId = groupId
                     if RefreshGroupManagement then RefreshGroupManagement() end
+                end
+                self.SelectGroupManagementGroup = function(_, groupId)
+                    if not HUDCraftDB.groups.byId[groupId] then return false end
+                    SelectGroup(groupId)
+                    return true
                 end
 
                 local function CreateMultiDropdownOptions(groupId)
@@ -724,10 +930,12 @@ function addon:CreateSettingsWindow()
                             border = false,
                         })
                     layout:AddContent(groupPage, settingsSection, { fillWidth = true, maxWidth = 1000 })
-                    layout:AreaHeader(settingsSection, "Group Settings")
+                    layout:AreaHeader(settingsSection,
+                        group.kind == "notepad" and "Notepad Settings" or "Group Settings")
 
                     local visibility = controls.AddCheckbox(settingsSection,
-                        "Show Group for This Character",
+                        group.kind == "notepad" and "Show Notepad for This Character"
+                            or "Show Group for This Character",
                         function() return HUDCraftCharDB.groupsEnabled[groupId] ~= false end,
                         function(enabled)
                             HUDCraftCharDB.groupsEnabled[groupId] = enabled and true or false
@@ -736,6 +944,7 @@ function addon:CreateSettingsWindow()
                         end)
                     layout:AddContent(settingsSection, visibility, { role = "control", fillWidth = true })
 
+                    if group.kind ~= "notepad" then
                     layout:AreaHeader(settingsSection, "Layout")
                     local orientationOptions = {
                         { name = "Horizontal", value = "row" },
@@ -761,6 +970,29 @@ function addon:CreateSettingsWindow()
                         { role = "control", fillWidth = true })
 
                     layout:AreaHeader(settingsSection, "Details Panel")
+                    local detailsEnabled = controls.AddCheckbox(settingsSection,
+                        "Show Details panel",
+                        function()
+                            local current = HUDCraftDB.groups.byId[groupId]
+                            return not current or current.detailsEnabled ~= false
+                        end,
+                        function(enabled)
+                            local current = HUDCraftDB.groups.byId[groupId]
+                            if not current then return end
+                            current.detailsEnabled = enabled == true
+                            if not enabled then
+                                local details = self.groupDetails and self.groupDetails[groupId]
+                                if details then
+                                    if details.hideTimer then details.hideTimer:Hide() end
+                                    details:Hide()
+                                    details.detailSource = nil
+                                    details.detailModule = nil
+                                end
+                            end
+                            self:RefreshGroup(groupId)
+                        end)
+                    layout:AddContent(settingsSection, detailsEnabled,
+                        { role = "control", fillWidth = true })
                     local detailsPositionOptions = {
                         { name = "Below", value = "bottom" },
                         { name = "Right", value = "right" },
@@ -785,6 +1017,7 @@ function addon:CreateSettingsWindow()
                         end)
                     layout:AddContent(settingsSection, detailsPositionPicker,
                         { role = "control", fillWidth = true })
+                    end
 
                     layout:AreaHeader(settingsSection, "Style")
                     local styleRow = layout:Row(settingsSection,
@@ -820,8 +1053,8 @@ function addon:CreateSettingsWindow()
 
                     local controlPanelOptions = {
                         { name = "No control panel", value = "never" },
-                        { name = "Always show control panel", value = "always" },
                         { name = "Show control panel on hover", value = "hover" },
+                        { name = "Always show control panel", value = "always" },
                     }
                     local controlPanelPicker = controls.AddDropdownContent(styleColumns[2],
                         "Control panel", controlPanelOptions,
@@ -841,6 +1074,43 @@ function addon:CreateSettingsWindow()
                         end)
                     layout:AddContent(styleColumns[2], controlPanelPicker, { role = "control", fillWidth = true })
 
+                    local controlPanelPositionOptions = {
+                        { name = "Above", value = "top" },
+                        { name = "Below", value = "bottom" },
+                        { name = "Left", value = "left" },
+                        { name = "Right", value = "right" },
+                    }
+                    local controlPanelPositionPicker = controls.AddDropdownContent(styleColumns[2],
+                        "Control Panel Location", controlPanelPositionOptions,
+                        function()
+                            local current = HUDCraftDB.groups.byId[groupId]
+                            local position = current and current.controlPanelPosition
+                            if position == "top" or position == "bottom"
+                                or position == "left" or position == "right" then
+                                return position
+                            end
+                            local fallback = HUDCraftDB.general.groupHeaderPosition
+                            if fallback == "top" or fallback == "bottom"
+                                or fallback == "left" or fallback == "right" then
+                                return fallback
+                            end
+                            return "top"
+                        end,
+                        function(value)
+                            if value ~= "top" and value ~= "bottom"
+                                and value ~= "left" and value ~= "right" then return end
+                            local current = HUDCraftDB.groups.byId[groupId]
+                            if not current then return end
+                            current.controlPanelPosition = value
+                            local window = self.groupFrames and self.groupFrames[groupId]
+                            if window then
+                                local anchors = { top = "right", left = "top", bottom = "left", right = "top" }
+                                window:SetFrameHeaderPosition(value, anchors[value])
+                            end
+                        end)
+                    layout:AddContent(styleColumns[2], controlPanelPositionPicker,
+                        { role = "control", fillWidth = true })
+
                     stylePicker = controls.AddDropdownContent(styleColumns[1], "Style", styleOptions,
                         function()
                             local current = HUDCraftDB.groups.byId[groupId]
@@ -856,6 +1126,7 @@ function addon:CreateSettingsWindow()
                     stylePicker:SetShown(group.useGlobalStyle == false)
                     layout:AddContent(styleColumns[1], stylePicker, { role = "control", fillWidth = true })
 
+                    if group.kind ~= "notepad" then
                     local modulesSection = layout:Section(groupPage,
                         "hudcraft-group-settings-modules-" .. tostring(groupId))
                     layout:AddContent(groupPage, modulesSection, { fillWidth = true, maxWidth = 1000 })
@@ -914,6 +1185,7 @@ function addon:CreateSettingsWindow()
                             if host.ScheduleMeasure then host.ScheduleMeasure() end
                         end)
                     layout:AddContent(columns[2], orderControl, { role = "control", fillWidth = true })
+                    end
 
                     return { stylePicker = stylePicker, orderControl = orderControl }
                 end
@@ -932,10 +1204,36 @@ function addon:CreateSettingsWindow()
                     return entries[groupId]
                 end
 
-                local function SyncGroupNavigation(groupIds)
-                    local signature = table.concat(groupIds, "\001")
+                local function SyncGroupNavigation(groupIds, notepadIds)
+                    local signature = table.concat(groupIds, "\001") .. "\002" .. table.concat(notepadIds, "\001")
                     if not navigation or signature ~= navigationOrderSignature then
-                        if navigation then navigation:Hide() end
+                        if navigation then
+                            navigation:Hide()
+                            if navigation.host then navigation.host:Hide() end
+                        end
+                        if notepadNavigation then
+                            notepadNavigation:Hide()
+                            if notepadNavigation.host then notepadNavigation.host:Hide() end
+                        end
+                        if notepadNavigationHeader then
+                            notepadNavigationHeader:Hide()
+                            if notepadNavigationHeader.underline then
+                                notepadNavigationHeader.underline:Hide()
+                            end
+                        end
+
+                        local metrics = layout.Metrics
+                        local sectionPadding = tonumber(metrics.SECTION_PADDING) or 5
+                        local contentGap = tonumber(metrics.CONTENT_GAP) or 2
+                        local sectionGap = tonumber(metrics.SECTION_GAP) or contentGap
+                        local navigationHeight = tonumber(ui.WindowStyles.GeometryDefaults.navigationItemHeight) or 28
+                        local groupNavHeight = #groupIds > 0
+                            and (sectionPadding * 2 + #groupIds * navigationHeight
+                                + math.max(0, #groupIds - 1) * contentGap) or 0
+                        local groupNavHost = CreateFrame("Frame", nil, sidebarScrollContent)
+                        groupNavHost:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT", 0, 0)
+                        groupNavHost:SetPoint("TOPRIGHT", sidebarScrollContent, "TOPRIGHT", 0, 0)
+                        groupNavHost:SetHeight(math.max(1, groupNavHeight))
                         local items = {}
                         for _, groupId in ipairs(groupIds) do
                             items[#items + 1] = {
@@ -944,48 +1242,149 @@ function addon:CreateSettingsWindow()
                             }
                         end
                         navigation = ui.NavigationControls:CreateVerticalSubpageNavigation(
-                            sidebarHost, items, {
+                            groupNavHost, items, {
+                                maxWidth = math.max(15, (window:GetWidth() or 1) * 0.30),
                                 onSelect = function(_, item)
                                     if item then SelectGroup(item.groupId) end
                                 end,
                             })
+                        navigation.host = groupNavHost
+                        navigation.separator:Hide()
+                        EnableSidebarWheel(navigation)
+                        for _, button in ipairs(navigation.buttons or {}) do
+                            EnableSidebarWheel(button)
+                        end
+                        navigationContentHeight = groupNavHeight
+
+                        if #notepadIds > 0 then
+                            local header = sidebarScrollContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                            header:SetJustifyH("LEFT")
+                            header:SetText("Notepads")
+                            header:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT",
+                                sectionPadding, -(groupNavHeight + sectionGap))
+                            EnableSidebarWheel(header)
+                            local function RepaintNotepadNavigationHeader(target)
+                                local color = ui.WindowStyles:GetTextColor("textInteractionAccentColor", content)
+                                if color then target:SetTextColor(unpack(color)) end
+                            end
+                            ui.WindowStyles:RegisterVisual(header, RepaintNotepadNavigationHeader)
+                            RepaintNotepadNavigationHeader(header)
+                            local underline = ui.WindowStyles:CreateFlatTexture(sidebarScrollContent, "BORDER",
+                                ui.WindowStyles:GetTextColor("textNeutralAccentColor", content))
+                            if underline then
+                                underline:SetHeight(2)
+                                underline:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+                                underline:SetWidth(math.max(1, header:GetStringWidth() or 1))
+                                ui.WindowStyles:RegisterVisual(underline, function(target)
+                                    target:SetVertexColor(unpack(ui.WindowStyles:GetTextColor(
+                                        "textNeutralAccentColor", content)))
+                                end)
+                            end
+                            header.underline = underline
+                            notepadNavigationHeader = header
+
+                            local noteHeaderHeight = math.max(header:GetStringHeight() or 12, 12) + 4
+                            local notepadNavigationHeight = sectionPadding * 2
+                                + #notepadIds * navigationHeight
+                                + math.max(0, #notepadIds - 1) * contentGap
+                            local noteHost = CreateFrame("Frame", nil, sidebarScrollContent)
+                            noteHost:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT", 0,
+                                -(groupNavHeight + sectionGap + noteHeaderHeight + contentGap))
+                            noteHost:SetPoint("TOPRIGHT", sidebarScrollContent, "TOPRIGHT", 0,
+                                -(groupNavHeight + sectionGap + noteHeaderHeight + contentGap))
+                            noteHost:SetHeight(math.max(1, notepadNavigationHeight))
+                            local noteItems = {}
+                            for _, groupId in ipairs(notepadIds) do
+                                noteItems[#noteItems + 1] = {
+                                    label = self:GetGroupName(groupId),
+                                    groupId = groupId,
+                                }
+                            end
+                            notepadNavigation = ui.NavigationControls:CreateVerticalSubpageNavigation(
+                                noteHost, noteItems, {
+                                    maxWidth = math.max(15, (window:GetWidth() or 1) * 0.30),
+                                    onSelect = function(_, item)
+                                        if item then SelectGroup(item.groupId) end
+                                    end,
+                                })
+                            notepadNavigation.host = noteHost
+                            notepadNavigation.separator:Hide()
+                            EnableSidebarWheel(notepadNavigation)
+                            for _, button in ipairs(notepadNavigation.buttons or {}) do
+                                EnableSidebarWheel(button)
+                            end
+                            navigationContentHeight = groupNavHeight + sectionGap
+                                + noteHeaderHeight + contentGap + notepadNavigationHeight
+                        else
+                            notepadNavigation = nil
+                            notepadNavigationHeader = nil
+                        end
+
+                        sidebarScrollContent:SetHeight(math.max(1, navigationContentHeight))
+                        -- The Notepad rail sits below the top Group rail, so its bounds depend on this update.
+                        sidebarViewport:UpdateScrollChildRect()
+                        local scrollRange = sidebarViewport:GetVerticalScrollRange() or 0
+                        sidebarViewport:SetVerticalScroll(math.min(
+                            sidebarViewport:GetVerticalScroll() or 0, scrollRange))
+                        if sidebarScrollbar and sidebarScrollbar.RefreshVisibility then
+                            sidebarScrollbar:RefreshVisibility()
+                        end
+                        ApplySidebarWidthLimit()
+                        if sidebarDivider then sidebarDivider:SetShown(#groupIds > 0 or #notepadIds > 0) end
                         navigationOrderSignature = signature
-                        scroll:ClearAllPoints()
-                        scroll:SetPoint("TOPLEFT", navigation, "TOPRIGHT", sidebarContentGap, 0)
-                        scroll:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT",
-                            -(tonumber(controls.ScrollbarGutterWidth) or 12), 0)
                     else
                         for index, groupId in ipairs(groupIds) do
                             navigation:SetLabel(index, self:GetGroupName(groupId))
                         end
+                        for index, groupId in ipairs(notepadIds) do
+                            notepadNavigation:SetLabel(index, self:GetGroupName(groupId))
+                        end
+                        ApplySidebarWidthLimit()
                     end
 
                     local selectedIndex
                     for index, groupId in ipairs(groupIds) do
                         if groupId == selectedGroupId then selectedIndex = index break end
                     end
-                    if selectedIndex then navigation:SetSelected(selectedIndex) end
+                    local selectedNotepadIndex
+                    for index, groupId in ipairs(notepadIds) do
+                        if groupId == selectedGroupId then selectedNotepadIndex = index break end
+                    end
+                    if selectedNotepadIndex and notepadNavigation then
+                        ClearNavigationSelection(navigation)
+                        notepadNavigation:SetSelected(selectedNotepadIndex)
+                    elseif selectedIndex then
+                        navigation:SetSelected(selectedIndex)
+                        ClearNavigationSelection(notepadNavigation)
+                    else
+                        ClearNavigationSelection(navigation)
+                        ClearNavigationSelection(notepadNavigation)
+                    end
                 end
 
                 RefreshGroupManagement = function()
                     local order = HUDCraftDB.groups.order or {}
-                    local present, validOrder = {}, {}
+                    local present, validOrder, validNotepads = {}, {}, {}
                     for _, groupId in ipairs(order) do
                         local group = HUDCraftDB.groups.byId[groupId]
                         if group then
                             present[groupId] = true
-                            validOrder[#validOrder + 1] = groupId
+                            if group.kind == "notepad" then
+                                validNotepads[#validNotepads + 1] = groupId
+                            else
+                                validOrder[#validOrder + 1] = groupId
+                            end
                             entries[groupId] = entries[groupId] or CreateGroupManagementEntry(groupId, group)
                         end
                     end
-                    SyncGroupNavigation(validOrder)
+                    if not selectedGroupId or not present[selectedGroupId] then
+                        selectedGroupId = validOrder[1] or validNotepads[1]
+                    end
+                    SyncGroupNavigation(validOrder, validNotepads)
                     for groupId, entry in pairs(entries) do
                         if not present[groupId] then
                             entry.page:Hide()
                         end
-                    end
-                    if not selectedGroupId or not present[selectedGroupId] then
-                        selectedGroupId = validOrder[1]
                     end
                     for groupId, entry in pairs(entries) do
                         local selected = groupId == selectedGroupId and present[groupId] == true
@@ -995,68 +1394,8 @@ function addon:CreateSettingsWindow()
                     if host.ScheduleMeasure then host.ScheduleMeasure() end
                 end
                 self.groupManagementRefresh = RefreshGroupManagement
+                content:HookScript("OnShow", RefreshGroupManagement)
 
-                self.GetGroupManagementDiagnostics = function()
-                    local lines = {}
-                    local function add(message) lines[#lines + 1] = message end
-                    local function number(value) return tonumber(value) or -1 end
-                    local function describeFrame(label, frame)
-                        if not frame then
-                            add(label .. "=nil")
-                            return
-                        end
-                        local left, bottom, width, height = frame:GetRect()
-                        add(string.format("%s shown=%s visible=%s size=%.1fx%.1f rect=%.1f,%.1f,%.1f,%.1f",
-                            label, tostring(frame:IsShown()), tostring(frame:IsVisible()),
-                            number(frame:GetWidth()), number(frame:GetHeight()),
-                            number(left), number(bottom), number(width), number(height)))
-                    end
-
-                    local groups = HUDCraftDB and HUDCraftDB.groups or {}
-                    local order = type(groups.order) == "table" and groups.order or {}
-                    local byId = type(groups.byId) == "table" and groups.byId or {}
-                    local defaults = addon.Defaults and addon.Defaults.Account
-                        and addon.Defaults.Account.groups or {}
-                    add(string.format("groups initialized=%s orderCount=%d selected=%s defaultOrderCount=%d",
-                        tostring(groups.initialized), #order, tostring(selectedGroupId),
-                        type(defaults.order) == "table" and #defaults.order or 0))
-                    for _, groupId in ipairs(order) do
-                        local group = byId[groupId]
-                        add(string.format("group id=%s exists=%s name=%q selectedModules=%s moduleOrder=%s",
-                            tostring(groupId), tostring(type(group) == "table"),
-                            tostring(group and group.name or ""),
-                            tostring(group and type(group.selectedModules) or "nil"),
-                            tostring(group and type(group.moduleOrder) or "nil")))
-                    end
-
-                    describeFrame("subpage", content)
-                    describeFrame("sidebarHost", sidebarHost)
-                    describeFrame("navigation", navigation)
-                    if navigation then
-                        add("navigation buttonCount=" .. tostring(#(navigation.buttons or {})))
-                        for index, button in ipairs(navigation.buttons or {}) do
-                            add(string.format("nav[%d] label=%q width=%.1f height=%.1f shown=%s visible=%s",
-                                index, tostring(button.label and button.label:GetText() or ""),
-                                number(button:GetWidth()), number(button:GetHeight()),
-                                tostring(button:IsShown()), tostring(button:IsVisible())))
-                        end
-                    end
-                    describeFrame("scroll", scroll)
-                    describeFrame("pageContent", pageContent)
-                    describeFrame("flow", flow)
-                    describeFrame("managementPanel", managementPanel)
-                    local entryCount = 0
-                    for _ in pairs(entries) do entryCount = entryCount + 1 end
-                    add(string.format("scrollRange=%.1f emptyNoteShown=%s entries=%d",
-                        number(scroll:GetVerticalScrollRange()), tostring(emptyGroupsText:IsShown()), entryCount))
-                    for groupId, entry in pairs(entries) do
-                        describeFrame("entry[" .. tostring(groupId) .. "]", entry.page)
-                        for index, child in ipairs(entry.page.layoutChildren or {}) do
-                            describeFrame("entry[" .. tostring(groupId) .. "].child[" .. index .. "]", child)
-                        end
-                    end
-                    return lines
-                end
                 RefreshGroupManagement()
                 BindHostedPage(ui, host)
             elseif pageId == "groups" and subpageId == "module-settings" then
@@ -1081,6 +1420,69 @@ function addon:CreateSettingsWindow()
                 local moduleNavigationItems = {
                     { id = "weaponSkills", label = "Weapon Skills" },
                     { id = "professions", label = "Professions" },
+                    { id = "reputation", label = "Reputation" },
+                    { id = "gold", label = "Gold" },
+                    { id = "durability", label = "Durability" },
+                    {
+                        id = "notepads",
+                        label = "Notepads",
+                        buildPage = function(flow)
+                            local section = layout:Section(flow, "hudcraft-notepad-help")
+                            layout:AddContent(flow, section, { fillWidth = true })
+                            layout:AreaHeader(section, "Notepads")
+                            local paragraphs = {
+                                {
+                                    label = "Standalone Windows:",
+                                    description = "Notepads are standalone, resizable windows. They are managed separately from Groups and cannot be added as modules to a Group.",
+                                },
+                                {
+                                    label = "Text Scope:",
+                                    description = "Each Notepad's text scope is chosen when it is created. Account-Wide Notepads share the same text across your characters on this WoW account. Per-Character Notepads keep separate text for each character.",
+                                },
+                                {
+                                    label = "Visibility and Position:",
+                                    description = "Both types follow the usual per-character visibility and position settings. A new Notepad is enabled on the character that creates it; enable it manually on other characters in Group Management.",
+                                },
+                                {
+                                    label = "Editing:",
+                                    description = "Unlock a Notepad to edit, move, or resize it. Its text saves as you type. Lock it when you want to prevent accidental edits or movement.",
+                                },
+                            }
+                            local function ColorText(role, text, frame)
+                                local color = ui.WindowStyles:GetTextColor(role, frame)
+                                local red = math.floor(math.max(0, math.min(1, color[1] or 1)) * 255 + 0.5)
+                                local green = math.floor(math.max(0, math.min(1, color[2] or 1)) * 255 + 0.5)
+                                local blue = math.floor(math.max(0, math.min(1, color[3] or 1)) * 255 + 0.5)
+                                return string.format("|cff%02X%02X%02X%s|r", red, green, blue, text or "")
+                            end
+                            local function AddLabeledParagraph(parent, labelText, noteText,
+                                labelColorRole, noteColorRole, gapBefore)
+                                local paragraph = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+                                paragraph:SetJustifyH("LEFT")
+                                paragraph:SetJustifyV("TOP")
+                                paragraph:SetWordWrap(true)
+                                if paragraph.SetNonSpaceWrap then paragraph:SetNonSpaceWrap(true) end
+                                local function RefreshParagraphColors()
+                                    paragraph:SetText(ColorText(labelColorRole, labelText, paragraph) .. " "
+                                        .. ColorText(noteColorRole, noteText, paragraph))
+                                end
+                                ui.WindowStyles:RegisterVisual(paragraph, RefreshParagraphColors)
+                                RefreshParagraphColors()
+                                layout:AddContent(parent, paragraph, {
+                                    role = "content",
+                                    fillWidth = true,
+                                    wrap = true,
+                                    gapBefore = gapBefore,
+                                })
+                            end
+                            for index, paragraph in ipairs(paragraphs) do
+                                AddLabeledParagraph(section, paragraph.label, paragraph.description,
+                                    "primary", "notes",
+                                    index == 1 and layout.Metrics.CONTENT_GAP
+                                        or layout.Metrics.SECTION_BODY_GAP)
+                            end
+                        end,
+                    },
                 }
                 moduleNavigation = ui.NavigationControls:CreateVerticalSubpageNavigation(
                     sidebarHost, moduleNavigationItems, {
@@ -1117,7 +1519,15 @@ function addon:CreateSettingsWindow()
 
                     local settingsEntries = module and type(module.getSettingsEntries) == "function"
                         and module.getSettingsEntries()
-                    if type(settingsEntries) == "table" then
+                    if type(navigationItem.buildPage) == "function" then
+                        navigationItem.buildPage(flow)
+                    elseif module and type(module.buildSettingsPage) == "function" then
+                        module.buildSettingsPage(flow, {
+                            addon = self,
+                            layout = layout,
+                            controls = controls,
+                        })
+                    elseif type(settingsEntries) == "table" then
                         local entries = settingsEntries
                     local moduleSettings = HUDCraftCharDB.moduleSettings
                     local config = moduleSettings[moduleId]
@@ -1170,19 +1580,21 @@ function addon:CreateSettingsWindow()
                     layout:AddContent(flow, section, { fillWidth = true })
                     layout:AreaHeader(section, navigationItem.label)
                     local description = layout:Note(section,
-                        "Choose which learned entries appear in each Group, then drag to set their display order. Untracked learned entries remain available in the Details pane when its module label is shown.", {
+                        module.settingsDescription or "Choose which learned entries appear in each Group, then drag to set their display order. Untracked learned entries remain available in the Details pane when its module label is shown.", {
                             justifyH = "LEFT",
                         })
                     layout:AddContent(section, description, { fillWidth = true, wrap = true })
 
-                    local showLabelControl = controls.AddCheckbox(section,
-                        "Show " .. navigationItem.label .. " label",
-                        function() return HUDCraftCharDB.moduleLabels[moduleId] ~= false end,
-                        function(enabled)
-                            HUDCraftCharDB.moduleLabels[moduleId] = enabled and true or false
-                            self:RefreshAllGroups({ moduleId })
-                        end)
-                    layout:AddContent(section, showLabelControl, { role = "control", fillWidth = true })
+                    if module.showLabelSetting ~= false then
+                        local showLabelControl = controls.AddCheckbox(section,
+                            "Show " .. navigationItem.label .. " label",
+                            function() return HUDCraftCharDB.moduleLabels[moduleId] ~= false end,
+                            function(enabled)
+                                HUDCraftCharDB.moduleLabels[moduleId] = enabled and true or false
+                                self:RefreshAllGroups({ moduleId })
+                            end)
+                        layout:AddContent(section, showLabelControl, { role = "control", fillWidth = true })
+                    end
 
                     local row = layout:Row(section, "hudcraft-module-tracking-row-" .. moduleId, { flow = true })
                     layout:AddContent(section, row, { fillWidth = true })
@@ -1306,6 +1718,9 @@ function addon:CreateSettingsWindow()
 
     mainNavigation:HookScript("OnSizeChanged", LayoutNavigation)
     subpageNavigation:HookScript("OnSizeChanged", LayoutNavigation)
+    window:HookScript("OnSizeChanged", function()
+        if self.groupManagementRefresh then self.groupManagementRefresh() end
+    end)
     self.LayoutSettingsNavigation = LayoutNavigation
     LayoutNavigation()
 

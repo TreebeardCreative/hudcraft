@@ -1,13 +1,27 @@
 local addonName, addon = ...
 
 addon.name = addonName
-addon.version = "0.1.66"
+addon.version = "0.1.125"
 addon.requiredTreebeardUIAPI = 1
+addon.requiredTreebeardUIVersion = "0.2.50"
+
+local function VersionAtLeast(version, required)
+    local versionMajor, versionMinor, versionPatch = tostring(version or ""):match("^(%d+)%.(%d+)%.(%d+)$")
+    local requiredMajor, requiredMinor, requiredPatch = tostring(required or ""):match("^(%d+)%.(%d+)%.(%d+)$")
+    if not versionMajor or not requiredMajor then return false end
+    local actual = { tonumber(versionMajor), tonumber(versionMinor), tonumber(versionPatch) }
+    local minimum = { tonumber(requiredMajor), tonumber(requiredMinor), tonumber(requiredPatch) }
+    for index = 1, 3 do
+        if actual[index] ~= minimum[index] then return actual[index] > minimum[index] end
+    end
+    return true
+end
 
 local library = _G.TreebeardUI
 addon.UI = library
 addon.libraryCompatible = type(library) == "table"
     and library.API_VERSION == addon.requiredTreebeardUIAPI
+    and VersionAtLeast(library.VERSION, addon.requiredTreebeardUIVersion)
     and type(library.HoverEffects) == "table"
     and type(library.HoverEffects.Attach) == "function"
     and type(library.NavigationControls) == "table"
@@ -29,13 +43,15 @@ addon.libraryCompatible = type(library) == "table"
     and type(library.SettingsPageMeasure) == "table"
     and type(library.SettingsPageMeasure.Create) == "function"
     and type(library.SettingsControls) == "table"
+    and type(library.SettingsControls.AttachScrollbar) == "function"
+    and type(library.SettingsControls.GetScrollbarGutterWidth) == "function"
     and type(library.ColorFactory) == "table"
 
 if not addon.libraryCompatible then
     addon.UI = nil
     local message
     if type(library) == "table" and library.API_VERSION == addon.requiredTreebeardUIAPI then
-        message = "hudcraft requires current TreebeardUI framework helpers; update TreebeardUI. Addon UI disabled."
+            message = "hudcraft requires TreebeardUI 0.2.50 or newer for current framework helpers. Update TreebeardUI. Addon UI disabled."
     else
         message = string.format(
             "hudcraft requires TreebeardUI API %s; installed API %s. Addon UI disabled.",

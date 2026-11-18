@@ -1,6 +1,7 @@
 local _, addon = ...
 
 local DETAIL_MIN_WIDTH = 120
+local DETAIL_MIN_HEIGHT = 30
 local DETAIL_GAP = 2
 local DETAIL_TEXT_INSET = 8
 local HIDE_DELAY = 0.15
@@ -70,14 +71,14 @@ local function CreateDetailsFrame(groupId, owner)
         owner = owner,
         sizing = {
             mode = "consumer",
-            initial = { width = DETAIL_MIN_WIDTH, height = 40 },
-            minimum = { width = 120, height = 40 },
+            initial = { width = DETAIL_MIN_WIDTH, height = DETAIL_MIN_HEIGHT },
+            minimum = { width = DETAIL_MIN_WIDTH, height = DETAIL_MIN_HEIGHT },
             position = { x = 0, y = 0 },
         },
         interaction = { movable = false, hover = false, borderHover = false },
         surface = { frameBorder = "body" },
     })
-    frame:SetExpandedSize(DETAIL_MIN_WIDTH, 40)
+    frame:SetExpandedSize(DETAIL_MIN_WIDTH, DETAIL_MIN_HEIGHT)
 
     local text = frame.content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     text:SetPoint("TOPLEFT", frame.content, "TOPLEFT", DETAIL_TEXT_INSET, -DETAIL_TEXT_INSET)
@@ -132,6 +133,18 @@ function addon:EnsureGroupDetailsFrame(groupId)
 end
 
 function addon:ShowGroupModuleDetails(groupId, module, source)
+    local group = HUDCraftDB and HUDCraftDB.groups and HUDCraftDB.groups.byId
+        and HUDCraftDB.groups.byId[groupId]
+    if not group or group.detailsEnabled == false then
+        local existing = self.groupDetails and self.groupDetails[groupId]
+        if existing then
+            if existing.hideTimer then existing.hideTimer:Hide() end
+            existing:Hide()
+            existing.detailSource = nil
+            existing.detailModule = nil
+        end
+        return false
+    end
     local details = GetDetailLines(module)
     local frame = self:EnsureGroupDetailsFrame(groupId)
     local groupFrame = self.groupFrames and self.groupFrames[groupId]
@@ -164,7 +177,7 @@ function addon:ShowGroupModuleDetails(groupId, module, source)
     frame.detailsText:SetWidth(textWidth)
     local textHeight = frame.detailsText:GetStringHeight()
         or frame.detailsText:GetHeight() or 1
-    local height = math.max(40,
+    local height = math.max(DETAIL_MIN_HEIGHT,
         math.ceil(textHeight + (DETAIL_TEXT_INSET * 2) + 2))
     frame.detailsText:SetHeight(math.max(1, textHeight))
     frame:SetExpandedSize(width, height)
