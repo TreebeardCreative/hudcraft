@@ -3,7 +3,7 @@ externals:
   TreebeardUI:
     url: https://github.com/TreebeardCreative/TreebeardUI.git
     type: git
-    commit: 4e98181c0cf25afa6affcb6f9fd76b1fe45a10c3
+    commit: 2174cd5abaeceba0b92eaa5c60f3cf8b23da858a
 move-folders:
   HUDCraft/TreebeardUI: TreebeardUI
 ignore:

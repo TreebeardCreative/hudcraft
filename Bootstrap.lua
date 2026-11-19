@@ -1,7 +1,7 @@
 local addonName, addon = ...
 
 addon.name = addonName
-addon.version = "2.0.1"
+addon.version = "2.1.0"
 addon.requiredTreebeardUIAPI = 1
 addon.requiredTreebeardUIVersion = "1.0"
 
