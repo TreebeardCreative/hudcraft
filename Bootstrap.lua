@@ -1,7 +1,7 @@
 local addonName, addon = ...
 
 addon.name = addonName
-addon.version = "2.0"
+addon.version = "2.0.1"
 addon.requiredTreebeardUIAPI = 1
 addon.requiredTreebeardUIVersion = "1.0"
 
@@ -54,13 +54,14 @@ addon.libraryCompatible = type(library) == "table"
     and type(library.SettingsControls) == "table"
     and type(library.SettingsControls.AttachScrollbar) == "function"
     and type(library.SettingsControls.GetScrollbarGutterWidth) == "function"
+    and type(library.SettingsControls.CreateCustomMultilineTextInput) == "function"
     and type(library.ColorFactory) == "table"
 
 if not addon.libraryCompatible then
     addon.UI = nil
     local message
     if type(library) == "table" and library.API_VERSION == addon.requiredTreebeardUIAPI then
-            message = "hudcraft requires TreebeardUI 1.0 or newer for current framework helpers. Update TreebeardUI. Addon UI disabled."
+            message = "hudcraft requires TreebeardUI 1.0 or newer with custom multiline editor support. Update TreebeardUI. Addon UI disabled."
     else
         message = string.format(
             "hudcraft requires TreebeardUI API %s; installed API %s. Addon UI disabled.",

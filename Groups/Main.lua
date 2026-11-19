@@ -242,7 +242,9 @@ function addon:CreateGroupFrame(groupId, initialPosition)
                 end
                 frame:SetBorderHoverEnabled(movable)
                 if config.kind == "notepad" then frame:SetResizeEnabled(movable) end
-                if frame.notepadEditBox then
+                if frame.notepadInputSurface then
+                    frame.notepadInputSurface:SetInputEnabled(movable)
+                elseif frame.notepadEditBox then
                     if not movable then frame.notepadEditBox:ClearFocus() end
                     frame.notepadEditBox:EnableMouse(movable)
                     frame.notepadEditBox:EnableKeyboard(movable)
@@ -278,34 +280,6 @@ function addon:CreateGroupFrame(groupId, initialPosition)
         HUDCraftCharDB.notepadTexts = type(HUDCraftCharDB.notepadTexts) == "table"
             and HUDCraftCharDB.notepadTexts or {}
 
-        local settingsControls = self.UI.SettingsControls
-        local slimScrollbarOptions = type(settingsControls.GetScrollbarGutterWidth) == "function"
-            and { variant = "slim" } or nil
-        local scrollbarGutter = slimScrollbarOptions
-            and settingsControls:GetScrollbarGutterWidth(slimScrollbarOptions)
-            or tonumber(settingsControls.ScrollbarGutterWidth) or 18
-        local scrollFrame = CreateFrame("ScrollFrame", nil, window.content)
-        scrollFrame:SetPoint("TOPLEFT", window.content, "TOPLEFT", 5, -5)
-        scrollFrame:SetPoint("BOTTOMRIGHT", window.content, "BOTTOMRIGHT", -(5 + scrollbarGutter), 5)
-        scrollFrame:EnableMouseWheel(true)
-        scrollFrame:SetScript("OnMouseWheel", function(target, delta)
-            local current = target:GetVerticalScroll() or 0
-            local range = target:GetVerticalScrollRange() or 0
-            target:SetVerticalScroll(math.max(0, math.min(range, current - delta * 35)))
-        end)
-
-        local editBox = CreateFrame("EditBox", nil, scrollFrame)
-        editBox:SetSize(1, 1)
-        editBox:SetMultiLine(true)
-        editBox:SetAutoFocus(false)
-        editBox:EnableMouse(true)
-        editBox:SetFontObject(GameFontHighlight)
-        -- Keep the text about 5 UI units from the slim scrollbar: 3 units of
-        -- text inset plus the scrollbar's 2-unit placement gap.
-        editBox:SetTextInsets(6, 3, 6, 6)
-        editBox:SetJustifyH("LEFT")
-        editBox:SetJustifyV("TOP")
-        editBox:SetIndentedWordWrap(false)
         local function GetNotepadText()
             if config.noteScope == "account" then return config.noteText or "" end
             return HUDCraftCharDB.notepadTexts[groupId] or ""
@@ -317,26 +291,31 @@ function addon:CreateGroupFrame(groupId, initialPosition)
                 HUDCraftCharDB.notepadTexts[groupId] = text
             end
         end
-        editBox:SetText(GetNotepadText())
-        scrollFrame:SetScrollChild(editBox)
-
-        local measureText = window.content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        measureText:SetPoint("TOPLEFT", window.content, "TOPLEFT", 6, -6)
-        measureText:SetAlpha(0)
-        measureText:SetJustifyH("LEFT")
-        measureText:SetJustifyV("TOP")
-        measureText:SetWordWrap(true)
-        if measureText.SetNonSpaceWrap then measureText:SetNonSpaceWrap(true) end
-        if measureText.SetMaxLines then measureText:SetMaxLines(0) end
-        measureText:SetText(editBox:GetText() or "")
-
         local styles = self.UI.WindowStyles
-        local function ApplyNotepadTextColor(target)
-            local color = styles:GetTextColor("textMainColor", target)
-            if color then target:SetTextColor(unpack(color)) end
-        end
-        styles:RegisterVisual(editBox, ApplyNotepadTextColor)
-        ApplyNotepadTextColor(editBox)
+        local surface = self.UI.SettingsControls:CreateCustomMultilineTextInput(window.content, {
+            insets={left=5, top=5, right=5, bottom=5},
+            -- Text inset plus the slim scrollbar's 2-unit lane gap gives the
+            -- established 5-unit visual clearance between text and scrollbar.
+            textInsets={left=6, right=3, top=6, bottom=6},
+            text=GetNotepadText(),
+            scrollbar={variant="slim"},
+            textColorRole=false,
+            caretWidth=1,
+            onTextChanged=function(box, userInput)
+                if userInput then SaveNotepadText(box:GetText()) end
+            end,
+            onVisibleTextCreated=function(text)
+                local function ApplyNotepadTextColor(target)
+                    local color = styles:GetTextColor("textMainColor", target)
+                    if color then target:SetTextColor(unpack(color)) end
+                end
+                styles:RegisterVisual(text, ApplyNotepadTextColor)
+                ApplyNotepadTextColor(text)
+            end,
+        })
+        local scrollFrame, editBox = surface.scrollFrame, surface.editBox
+        local slimScrollbar = surface.scrollbar
+        window.notepadInputSurface = surface
         window.notepadEditBox = editBox
 
         local function SetNotepadEditingBorder(editing)
@@ -365,55 +344,14 @@ function addon:CreateGroupFrame(groupId, initialPosition)
         editBox:HookScript("OnEditFocusLost", function()
             SetNotepadEditingBorder(false)
         end)
-        local function RefreshNotepadScrollSize()
-            local width = math.max(1, scrollFrame:GetWidth() or 1)
-            local text = editBox:GetText() or ""
-            local explicitLines = select(2, text:gsub("\n", "")) + 1
-            local _, fontSize = editBox:GetFont()
-            local explicitLineHeight = explicitLines * (tonumber(fontSize) or 12)
-            measureText:SetWidth(math.max(1, width - 12))
-            measureText:SetText(text)
-            local measuredTextHeight = 0
-            if type(measureText.GetStringHeight) == "function" then
-                measuredTextHeight = tonumber(measureText:GetStringHeight()) or 0
-            end
-            local height = math.max(scrollFrame:GetHeight() or 1,
-                measuredTextHeight + 12, explicitLineHeight + 12)
-            editBox:SetSize(width, height)
-            scrollFrame:UpdateScrollChildRect()
-            local range = math.max(0, scrollFrame:GetVerticalScrollRange() or 0)
-            local current = scrollFrame:GetVerticalScroll() or 0
-            scrollFrame:SetVerticalScroll(math.max(0, math.min(range, current)))
-            if window.notepadScrollbar and window.notepadScrollbar.RefreshVisibility then
-                window.notepadScrollbar:RefreshVisibility()
-            end
-        end
-        local sizeUpdate = CreateFrame("Frame", nil, window.content)
-        sizeUpdate:Hide()
-        sizeUpdate:SetScript("OnUpdate", function(target)
-            target:Hide()
-            RefreshNotepadScrollSize()
-        end)
-        local function QueueNotepadScrollSize()
-            sizeUpdate:Show()
-        end
-        scrollFrame:SetScript("OnSizeChanged", QueueNotepadScrollSize)
-        editBox:HookScript("OnTextChanged", QueueNotepadScrollSize)
         window.notepadScrollFrame = scrollFrame
-        window.notepadScrollbar = settingsControls:AttachScrollbar(
-            window.content, scrollFrame, nil, slimScrollbarOptions)
-
-        editBox:SetScript("OnTextChanged", function(box, userInput)
-            if userInput then SaveNotepadText(box:GetText()) end
-            QueueNotepadScrollSize()
-        end)
+        window.notepadScrollbar = slimScrollbar
         editBox:SetScript("OnEscapePressed", function(box) box:ClearFocus() end)
         local isMovable = window:GetMovableEnabled()
         window:SetResizeEnabled(isMovable)
         SetFrameTreeMouseEnabled(window.notepadScrollbar, isMovable)
-        editBox:EnableKeyboard(isMovable)
+        surface:SetInputEnabled(isMovable)
         if not isMovable then editBox:ClearFocus() end
-        QueueNotepadScrollSize()
     else
         self.groupRenderers[groupId] = self.GroupRenderer:Create(window.content, {
             groupId = groupId,
