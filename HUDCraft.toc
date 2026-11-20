@@ -3,7 +3,7 @@
 ## Group: TreebeardUI
 ## Notes: Customizable information HUD for World of Warcraft: Forever.
 ## Author: TreebeardCreative
-## Version: 2.1.0
+## Version: 2.1.10
 ## IconTexture: Interface\AddOns\HUDCraft\Textures\hudcraft_icon.tga
 ## Dependencies: TreebeardUI
 ## SavedVariables: HUDCraftDB

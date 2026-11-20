@@ -219,6 +219,13 @@ function addon:CreateGroupFrame(groupId, initialPosition)
     end
     local initialWidth, initialHeight = config.kind == "notepad" and 320 or 280,
         config.kind == "notepad" and 180 or 40
+    local position = {}
+    local positionSource = type(initialPosition) == "table"
+        and initialPosition or GetDefaultGroupPosition(groupId)
+    for key, value in pairs(positionSource) do
+        position[key] = value
+    end
+    position.mode = "screenAdaptive"
     local window = self.UI.WindowFrame:Create({
         id = groupId,
         title = "",
@@ -228,7 +235,7 @@ function addon:CreateGroupFrame(groupId, initialPosition)
             initial = { width = initialWidth, height = initialHeight },
             minimum = config.kind == "notepad"
                 and { width = 180, height = 100 } or { width = 15, height = 15 },
-            position = initialPosition or GetDefaultGroupPosition(groupId),
+            position = position,
         },
         interaction = {
             movable = initialMovable,
@@ -306,8 +313,31 @@ function addon:CreateGroupFrame(groupId, initialPosition)
             end,
             onVisibleTextCreated=function(text)
                 local function ApplyNotepadTextColor(target)
-                    local color = styles:GetTextColor("textMainColor", target)
-                    if color then target:SetTextColor(unpack(color)) end
+                    local colorFactory = self.UI.ColorFactory
+                    local overrides = HUDCraftDB.styles and HUDCraftDB.styles.groupOverrides
+                    local colors = overrides and overrides.colors
+                    local opacity = overrides and overrides.opacity
+                    local customColor = type(colors) == "table" and colors.notepadText
+                    local alpha = math.max(0, math.min(100,
+                        tonumber(type(opacity) == "table" and opacity.notepadText) or 100)) / 100
+                    local red, green, blue
+                    local styleAlpha = 1
+                    if type(customColor) == "string" and customColor:match("^#%x%x%x%x%x%x$") then
+                        red, green, blue = colorFactory.ToRGBA(customColor)
+                    else
+                        local group = HUDCraftDB.groups.byId[groupId]
+                        local presetName = group and group.useGlobalStyle == false
+                            and group.customStyle or HUDCraftDB.styles.groups
+                        local preset = styles.Presets[presetName] or styles.Presets[styles.DefaultPreset]
+                        if preset then
+                            local color = styles:ResolveColor(preset.textMainColor, preset)
+                            if color then
+                                red, green, blue = color[1], color[2], color[3]
+                                styleAlpha = color[4] or 1
+                            end
+                        end
+                    end
+                    if red then target:SetTextColor(red, green, blue, styleAlpha * alpha) end
                 end
                 styles:RegisterVisual(text, ApplyNotepadTextColor)
                 ApplyNotepadTextColor(text)
@@ -317,6 +347,21 @@ function addon:CreateGroupFrame(groupId, initialPosition)
         local slimScrollbar = surface.scrollbar
         window.notepadInputSurface = surface
         window.notepadEditBox = editBox
+
+        window.SetNotepadTextSize = function(_, size)
+            size = tonumber(size)
+            if not size or size < 10 or size > 20 or size % 2 ~= 0 then return end
+            local fontTargets = { editBox, surface.visibleText, surface.measureText }
+            for _, fontTarget in ipairs(fontTargets) do
+                if fontTarget and fontTarget.GetFont and fontTarget.SetFont then
+                    local fontPath, _, fontFlags = fontTarget:GetFont()
+                    if fontPath then fontTarget:SetFont(fontPath, size, fontFlags or "") end
+                end
+            end
+            if surface.caret then surface.caret:SetHeight(size) end
+            if surface.QueueGeometry then surface:QueueGeometry() end
+        end
+        window:SetNotepadTextSize(tonumber(config.notepadTextSize) or 12)
 
         local function SetNotepadEditingBorder(editing)
             if not editing then
@@ -360,7 +405,9 @@ function addon:CreateGroupFrame(groupId, initialPosition)
             horizontalGap = math.max(0, tonumber(HUDCraftDB.general.spacing) or 6),
             verticalGap = math.max(0, tonumber(HUDCraftDB.general.spacing) or 6),
             padding = 5,
-            onSizeChanged = function(width, height) window:SetExpandedSize(width + 2, height + 2) end,
+            onSizeChanged = function(width, height)
+                window:SetExpandedSize(width + 2, height + 2)
+            end,
             onModuleEnter = function(module, source)
                 self:ShowGroupModuleDetails(groupId, module, source)
             end,

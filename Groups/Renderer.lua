@@ -79,7 +79,12 @@ local function CreateVisual(parent, options, isModule)
 
     if addon.UI and addon.UI.WindowStyles then
         local function ApplyTextColor(target)
-            target:SetTextColor(unpack(addon.UI.WindowStyles:GetTextColor("textInteractionAccentColor", target)))
+            local styles = addon.UI.WindowStyles
+            local style = styles:GetForFrame(target)
+            local color = style and style.groupContentTextColor
+                and styles:ResolveColor(style.groupContentTextColor, style)
+                or styles:GetTextColor("textInteractionAccentColor", target)
+            target:SetTextColor(unpack(color))
         end
         addon.UI.WindowStyles:RegisterVisual(visual.text, ApplyTextColor)
         ApplyTextColor(visual.text)

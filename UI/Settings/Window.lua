@@ -446,6 +446,8 @@ function addon:CreateSettingsWindow()
                     local value
                     if key == "text" then
                         value = styles:ResolveColor(base.textInteractionAccentColor, base)
+                    elseif key == "notepadText" then
+                        value = styles:ResolveColor(base.textMainColor, base)
                     elseif key == "border" then
                         value = styles:GetWindowBorderColor(base)
                     elseif key == "interaction" then
@@ -474,16 +476,18 @@ function addon:CreateSettingsWindow()
                 end
                 local function SetOverrideOpacity(key, value)
                     value = tonumber(value)
-                    if not value or value < 0 or value > 100 then return end
+                    if not value or value < 0 or value > 100 then return false end
                     overrides.opacity[key] = math.floor(value + 0.5)
                     self:ApplyAllGroupAppearances()
+                    return true
                 end
 
                 local opacityValues = {}
-                for value = 0, 100, 5 do opacityValues[#opacityValues + 1] = value end
+                for value = 0, 100 do opacityValues[#opacityValues + 1] = value end
                 local function FormatOpacity(value) return tostring(value) .. "%" end
                 local overrideRows = {
                     { key = "text", colorLabel = "Group text color", opacityLabel = "Group text opacity" },
+                    { key = "notepadText", colorLabel = "Notepad text color", opacityLabel = "Notepad text opacity" },
                     { key = "border", colorLabel = "Border color", opacityLabel = "Border opacity" },
                     { key = "interaction", colorLabel = "Interaction color", opacityLabel = "Interaction opacity" },
                     { key = "background", colorLabel = "Background color", opacityLabel = "Background opacity" },
@@ -498,7 +502,11 @@ function addon:CreateSettingsWindow()
                     local colorInput = controls.AddHexColorContent(columns[1], rowDefinition.colorLabel,
                         function() return GetOverrideColor(rowDefinition.key) end,
                         function(value) return SetOverrideColor(rowDefinition.key, value) end,
-                        function() self:ApplyAllGroupAppearances() end)
+                        function() self:ApplyAllGroupAppearances() end,
+                        {
+                            get = function() return GetOverrideOpacity(rowDefinition.key) end,
+                            set = function(value) return SetOverrideOpacity(rowDefinition.key, value) end,
+                        })
                     colorInput.editBox:SetMaxLetters(7)
                     layout:AddContent(columns[1], colorInput, { role = "color", fillWidth = true })
 
@@ -1020,19 +1028,12 @@ function addon:CreateSettingsWindow()
                     end
 
                     layout:AreaHeader(settingsSection, "Style")
-                    local styleRow = layout:Row(settingsSection,
-                        "hudcraft-group-style-row-" .. tostring(groupId), { flow = true })
-                    layout:AddContent(settingsSection, styleRow, { fillWidth = true })
-                    local styleColumns = layout:Columns(styleRow, 2, {
-                        "hudcraft-group-style-mode-" .. tostring(groupId),
-                        "hudcraft-group-control-panel-" .. tostring(groupId),
-                    })
                     local styleChoices = {
                         { name = "Global style", value = "global" },
                         { name = "Custom style", value = "custom" },
                     }
                     local stylePicker
-                    local styleMode = controls.AddRadioSelectorContent(styleColumns[1],
+                    local styleMode = controls.AddRadioSelectorContent(settingsSection,
                         "", styleChoices,
                         function()
                             local current = HUDCraftDB.groups.byId[groupId]
@@ -1049,14 +1050,55 @@ function addon:CreateSettingsWindow()
                             self:ApplyGroupAppearance(groupId)
                             if host.ScheduleMeasure then host.ScheduleMeasure() end
                         end)
-                    layout:AddContent(styleColumns[1], styleMode, { role = "control", fillWidth = true })
+                    layout:AddContent(settingsSection, styleMode, { role = "control", fillWidth = true })
 
+                    stylePicker = controls.AddDropdownContent(settingsSection, "Style", styleOptions,
+                        function()
+                            local current = HUDCraftDB.groups.byId[groupId]
+                            local value = current and current.customStyle
+                            return ui.WindowStyles.Presets[value] and value or HUDCraftDB.styles.groups
+                        end,
+                        function(value)
+                            local current = HUDCraftDB.groups.byId[groupId]
+                            if not current or not ui.WindowStyles.Presets[value] then return end
+                            current.customStyle = value
+                            self:ApplyGroupAppearance(groupId)
+                        end)
+                    stylePicker:SetShown(group.useGlobalStyle == false)
+                    layout:AddContent(settingsSection, stylePicker, { role = "control", fillWidth = true })
+
+                    if group.kind == "notepad" then
+                        local textSizeValues = { 10, 12, 14, 16, 18, 20 }
+                        local function FormatNotepadTextSize(value)
+                            return tostring(value) .. " pt"
+                        end
+                        local textSizeSlider = controls.AddSteppedSlider(settingsSection,
+                            "Text size", textSizeValues, 0, 0,
+                            function()
+                                local current = HUDCraftDB.groups.byId[groupId]
+                                return current and tonumber(current.notepadTextSize) or 12
+                            end,
+                            function(value)
+                                local current = HUDCraftDB.groups.byId[groupId]
+                                local window = self.groupFrames and self.groupFrames[groupId]
+                                if not current or not window or not window.SetNotepadTextSize then return end
+                                value = tonumber(value)
+                                if not value or value < 10 or value > 20 or value % 2 ~= 0 then return end
+                                current.notepadTextSize = value
+                                window:SetNotepadTextSize(value)
+                            end,
+                            FormatNotepadTextSize)
+                        layout:AddContent(settingsSection, textSizeSlider,
+                            { role = "slider", fillWidth = true })
+                    end
+
+                    layout:AreaHeader(settingsSection, "Control Panel")
                     local controlPanelOptions = {
                         { name = "No control panel", value = "never" },
                         { name = "Show control panel on hover", value = "hover" },
                         { name = "Always show control panel", value = "always" },
                     }
-                    local controlPanelPicker = controls.AddDropdownContent(styleColumns[2],
+                    local controlPanelPicker = controls.AddDropdownContent(settingsSection,
                         "Control panel", controlPanelOptions,
                         function()
                             local current = HUDCraftDB.groups.byId[groupId]
@@ -1072,7 +1114,7 @@ function addon:CreateSettingsWindow()
                             local window = self.groupFrames and self.groupFrames[groupId]
                             if window then window:SetFrameHeaderVisibility(value) end
                         end)
-                    layout:AddContent(styleColumns[2], controlPanelPicker, { role = "control", fillWidth = true })
+                    layout:AddContent(settingsSection, controlPanelPicker, { role = "control", fillWidth = true })
 
                     local controlPanelPositionOptions = {
                         { name = "Above", value = "top" },
@@ -1080,7 +1122,7 @@ function addon:CreateSettingsWindow()
                         { name = "Left", value = "left" },
                         { name = "Right", value = "right" },
                     }
-                    local controlPanelPositionPicker = controls.AddDropdownContent(styleColumns[2],
+                    local controlPanelPositionPicker = controls.AddDropdownContent(settingsSection,
                         "Control Panel Location", controlPanelPositionOptions,
                         function()
                             local current = HUDCraftDB.groups.byId[groupId]
@@ -1108,23 +1150,8 @@ function addon:CreateSettingsWindow()
                                 window:SetFrameHeaderPosition(value, anchors[value])
                             end
                         end)
-                    layout:AddContent(styleColumns[2], controlPanelPositionPicker,
+                    layout:AddContent(settingsSection, controlPanelPositionPicker,
                         { role = "control", fillWidth = true })
-
-                    stylePicker = controls.AddDropdownContent(styleColumns[1], "Style", styleOptions,
-                        function()
-                            local current = HUDCraftDB.groups.byId[groupId]
-                            local value = current and current.customStyle
-                            return ui.WindowStyles.Presets[value] and value or HUDCraftDB.styles.groups
-                        end,
-                        function(value)
-                            local current = HUDCraftDB.groups.byId[groupId]
-                            if not current or not ui.WindowStyles.Presets[value] then return end
-                            current.customStyle = value
-                            self:ApplyGroupAppearance(groupId)
-                        end)
-                    stylePicker:SetShown(group.useGlobalStyle == false)
-                    layout:AddContent(styleColumns[1], stylePicker, { role = "control", fillWidth = true })
 
                     if group.kind ~= "notepad" then
                     local modulesSection = layout:Section(groupPage,

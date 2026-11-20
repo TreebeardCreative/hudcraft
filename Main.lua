@@ -351,7 +351,7 @@ function addon:Initialize()
     local groupOverrides = HUDCraftDB.styles.groupOverrides
     groupOverrides.colors = type(groupOverrides.colors) == "table" and groupOverrides.colors or {}
     groupOverrides.opacity = type(groupOverrides.opacity) == "table" and groupOverrides.opacity or {}
-    for _, key in ipairs({ "text", "border", "interaction", "background" }) do
+    for _, key in ipairs({ "text", "notepadText", "border", "interaction", "background" }) do
         local color = groupOverrides.colors[key]
         if type(color) ~= "string" or not color:match("^#%x%x%x%x%x%x$") then
             groupOverrides.colors[key] = nil
@@ -417,6 +417,9 @@ function addon:Initialize()
     self:CreateSettingsWindow()
     self:CreateAddonOptionsPanel()
     self:CreateMinimapButton()
+    if self.mainGroup and self.mainGroup:IsShown() then
+        self.mainGroup:BringToFront()
+    end
     self.initialized = true
     self:Log("Loaded hudcraft " .. self.version .. " with TreebeardUI API " .. tostring(self.requiredTreebeardUIAPI))
 end

@@ -89,7 +89,11 @@ local function CreateDetailsFrame(groupId, owner)
     frame.detailsText = text
 
     local function ApplyTextColor(target)
-        local color = addon.UI.WindowStyles:GetTextColor("textMainColor", target)
+        local styles = addon.UI.WindowStyles
+        local style = styles:GetForFrame(target)
+        local color = style and style.groupContentTextColor
+            and styles:ResolveColor(style.groupContentTextColor, style)
+            or styles:GetTextColor("textMainColor", target)
         if color then target:SetTextColor(unpack(color)) end
     end
     addon.UI.WindowStyles:RegisterVisual(text, ApplyTextColor)

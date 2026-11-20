@@ -2,7 +2,6 @@ local _, addon = ...
 
 local INTERNAL_PREFIX = "__HUDCRAFT_GROUP_OVERRIDE_"
 local FAMILY_BY_OVERRIDE = {
-    text = "baseText",
     border = "neutralAccent",
     interaction = "interactionAccent",
     background = "canvas",
@@ -121,28 +120,21 @@ function addon:GetGroupStylePreset(baseName)
     -- frame-header surface while retaining this preset's original geometry.
     preset.mainCanvasColor = "canvas_1"
 
-    if ValidHex(override.colors.text) then
-        preset.textMainColor = "baseText_1"
-        preset.textNeutralAccentColor = "baseText_1"
-        preset.textInteractionAccentColor = "baseText_1"
-        preset.textColorRoleMap = {
-            primary = "textMainColor",
-            value = "textMainColor",
-            header = "textMainColor",
-            notes = "textMainColor",
-        }
-    else
-        local sourceMap = baseStyle.textColorRoleMap or {}
-        local function AlphaTextSlot(slotName)
-            local token = baseStyle[slotName]
-            local color = baseStyle.colorFactoryColors and baseStyle.colorFactoryColors[token] or token
-            return CopyRGBA(factory, color, Opacity(override, "text")) or token
+    local sourceMap = baseStyle.textColorRoleMap or {}
+    preset.textColorRoleMap = {}
+    for role, slot in pairs(sourceMap) do preset.textColorRoleMap[role] = slot end
+
+    -- Keep Group text overrides scoped to HUD content. Window titles,
+    -- navigation labels, and control headers retain their style roles.
+    preset.groupContentTextColor = nil
+    local hasTextOverride = ValidHex(override.colors.text)
+        or (tonumber(override.opacity.text) and tonumber(override.opacity.text) ~= 100)
+    if hasTextOverride then
+        local value = override.colors.text
+        if not ValidHex(value) then
+            value = styles:ResolveColor(baseStyle.textInteractionAccentColor, preset)
         end
-        preset.textMainColor = AlphaTextSlot("textMainColor")
-        preset.textNeutralAccentColor = AlphaTextSlot("textNeutralAccentColor")
-        preset.textInteractionAccentColor = AlphaTextSlot("textInteractionAccentColor")
-        preset.textColorRoleMap = {}
-        for role, slot in pairs(sourceMap) do preset.textColorRoleMap[role] = slot end
+        preset.groupContentTextColor = CopyRGBA(factory, value, Opacity(override, "text"))
     end
 
     return presetName
