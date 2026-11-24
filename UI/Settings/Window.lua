@@ -873,7 +873,7 @@ function addon:CreateSettingsWindow()
                     return true
                 end
 
-                local function CreateMultiDropdownOptions(groupId)
+                local function CreateMultiDropdownOptions(groupId, updateOrderList)
                     local options = {}
                     for _, module in ipairs(moduleOptions) do
                         local moduleId = module.id
@@ -908,8 +908,7 @@ function addon:CreateSettingsWindow()
                                 end
                                 group.moduleOrder = order
                                 self:RefreshGroup(groupId)
-                                local entry = entries[groupId]
-                                if entry and entry.orderControl then entry.orderControl:SetValues(order) end
+                                if updateOrderList then updateOrderList(order) end
                                 if host.ScheduleMeasure then host.ScheduleMeasure() end
                             end,
                         }
@@ -1151,8 +1150,11 @@ function addon:CreateSettingsWindow()
                         "hudcraft-group-module-order-" .. tostring(groupId),
                     })
 
+                    local orderControl
                     local modulePicker = controls.AddMultiDropdownContent(columns[1],
-                        "Module List", CreateMultiDropdownOptions(groupId), 206, { emptyText = "None" })
+                        "Module List", CreateMultiDropdownOptions(groupId, function(order)
+                            if orderControl then orderControl:SetValues(order) end
+                        end), 206, { emptyText = "None" })
                     layout:AddContent(columns[1], modulePicker, { role = "control", fillWidth = true })
 
                     local orderedIds = {}
@@ -1169,7 +1171,7 @@ function addon:CreateSettingsWindow()
                             seen[module.id] = true
                         end
                     end
-                    local orderControl = controls.AddDraggableOrderedListContent(columns[2],
+                    orderControl = controls.AddDraggableOrderedListContent(columns[2],
                         "Module Order", orderedIds,
                         function(moduleId)
                             local module = moduleById[moduleId]
@@ -1202,7 +1204,7 @@ function addon:CreateSettingsWindow()
                     layout:AddContent(columns[2], orderControl, { role = "control", fillWidth = true })
                     end
 
-                    return { stylePicker = stylePicker, orderControl = orderControl }
+                    return { stylePicker = stylePicker }
                 end
 
                 local function CreateGroupManagementEntry(groupId, group)
@@ -1213,7 +1215,6 @@ function addon:CreateSettingsWindow()
                     groupPage:Hide()
                     entries[groupId] = {
                         page = groupPage,
-                        orderControl = controlsForGroup.orderControl,
                         stylePicker = controlsForGroup.stylePicker,
                     }
                     return entries[groupId]
