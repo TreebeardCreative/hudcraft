@@ -2,7 +2,6 @@ local addonName, addon = ...
 
 addon.commandHelpLines = {
     "/hudcraft - Toggle the Settings window.",
-    "/hudcraft settings - Toggle the Settings window.",
     "/hudcraft minimap - Show or hide the minimap button.",
     "/hudcraft commands - List available commands.",
     "/hudcraft recover [name] - List Groups or center and unlock one for this character.",
@@ -12,6 +11,7 @@ function addon:Initialize()
     if self.initialized then return end
 
     HUDCraftDB = type(HUDCraftDB) == "table" and HUDCraftDB or {}
+    local previousAccountVersion = tonumber(HUDCraftDB.version) or 0
     HUDCraftDB.minimap = type(HUDCraftDB.minimap) == "table" and HUDCraftDB.minimap or {}
     if type(HUDCraftDB.minimap.hide) ~= "boolean" then HUDCraftDB.minimap.hide = false end
     local minimapAngle = tonumber(HUDCraftDB.minimap.angle)
@@ -351,7 +351,7 @@ function addon:Initialize()
     local groupOverrides = HUDCraftDB.styles.groupOverrides
     groupOverrides.colors = type(groupOverrides.colors) == "table" and groupOverrides.colors or {}
     groupOverrides.opacity = type(groupOverrides.opacity) == "table" and groupOverrides.opacity or {}
-    for _, key in ipairs({ "text", "notepadText", "border", "interaction", "background" }) do
+    for _, key in ipairs({ "text", "notepadText", "border", "interaction", "hover", "background" }) do
         local color = groupOverrides.colors[key]
         if type(color) ~= "string" or not color:match("^#%x%x%x%x%x%x$") then
             groupOverrides.colors[key] = nil
@@ -363,6 +363,24 @@ function addon:Initialize()
             groupOverrides.opacity[key] = nil
         else
             groupOverrides.opacity[key] = math.floor(math.max(0, math.min(100, opacity)) + 0.5)
+        end
+    end
+    -- Preserve the previous interaction override's hover appearance when the
+    -- new independent Hover field is introduced. The saved Interaction value
+    -- remains intact and now controls only the interaction/drag state.
+    if previousAccountVersion < 6 then
+        if groupOverrides.colors.hover == nil then
+            local oldInteractionColor = groupOverrides.colors.interaction
+            if type(oldInteractionColor) == "string"
+                and oldInteractionColor:match("^#%x%x%x%x%x%x$") then
+                groupOverrides.colors.hover = oldInteractionColor
+            end
+        end
+        if groupOverrides.opacity.hover == nil then
+            local oldInteractionOpacity = groupOverrides.opacity.interaction
+            if oldInteractionOpacity ~= nil then
+                groupOverrides.opacity.hover = oldInteractionOpacity
+            end
         end
     end
     for groupId, group in pairs(savedGroups) do
@@ -451,6 +469,6 @@ SlashCmdList.HUDCRAFT = function(message)
     elseif command == "" or command == "settings" then
         addon:ToggleSettings()
     else
-        print("hudcraft: /hudcraft [settings|minimap|commands|recover]")
+        print("hudcraft: /hudcraft opens Settings; subcommands: minimap, commands, recover [name].")
     end
 end

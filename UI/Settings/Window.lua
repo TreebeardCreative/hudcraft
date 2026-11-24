@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local SIDEBAR_SECTION_TITLE_FONT_SIZE = 14
 
 local PAGES = {
     {
@@ -116,43 +117,22 @@ function addon:CreateSettingsWindow()
                 local layout = ui.SettingsLayout
                 local controls = ui.SettingsControls
                 local host, flow = CreateHostedPage(ui, content, layout, "hudcraft-welcome")
-                local scroll, pageContent, scrollbar = host.scroll, host.content, host.scrollbar
                 flow.layoutHorizontalAlign = "CENTER"
-                local centeredHeaders = {}
-
                 local function AddAreaHeader(parent, text, centered)
-                    local label, underline
+                    local label
                     if centered then
-                        label, underline = layout:AreaHeader(parent, text, { justifyH = "CENTER" })
+                        label = layout:AreaHeader(parent, text, { justifyH = "CENTER" })
                     else
-                        label, underline = layout:AreaHeader(parent, text)
+                        label = layout:AreaHeader(parent, text)
                     end
-                    if not label or not underline then return end
-                    if centered then
-                        centeredHeaders[#centeredHeaders + 1] = { label = label, underline = underline }
-                    end
-                    return label, underline
+                    if not label then return end
+                    return label
                 end
                 local function AddHeader(parent, text)
                     return AddAreaHeader(parent, text, false)
                 end
                 local function AddCenteredHeader(parent, text)
                     return AddAreaHeader(parent, text, true)
-                end
-                local function RecenterUnderlines()
-                    for _, header in ipairs(centeredHeaders) do
-                        local label, underline = header.label, header.underline
-                        local availableWidth = math.max(1, label:GetWidth() or 1)
-                        local measuredWidth = tonumber(label:GetStringWidth()) or availableWidth
-                        local lineWidth = math.max(1, math.min(availableWidth, measuredWidth))
-                        local point, relativeTo, relativePoint, _, yOffset = underline:GetPoint(1)
-                        if point then
-                            underline:ClearAllPoints()
-                            underline:SetPoint(point, relativeTo, relativePoint,
-                                (availableWidth - lineWidth) / 2, yOffset)
-                            underline:SetWidth(lineWidth)
-                        end
-                    end
                 end
                 local function AddText(parent, text, isNote, justifyH)
                     local item
@@ -203,10 +183,10 @@ function addon:CreateSettingsWindow()
                     if summary then
                         AddText(section, summary, true, centered and "CENTER" or nil)
                     end
-                    return section
+                    return section, titleHeader
                 end
 
-                local addonInfo = NewSection("addon-information", "Addon Information")
+                local addonInfo = NewSection("addon-information", "Addon Information", nil, true)
                 AddText(addonInfo,
                     "hudcraft is a lightweight information HUD for WoW Forever. It works " ..
                     "alongside your existing interface, focusing on useful information " ..
@@ -258,8 +238,16 @@ function addon:CreateSettingsWindow()
                     })
                 end)
 
+                local whatsNew = NewSection("whats-new", "What's New", nil, true)
+                AddText(whatsNew,
+                    "- Custom color picker accessed by clicking the color swatch on color inputs.\n" ..
+                    "- Group overrides expanded to include custom hover and interaction colors.\n" ..
+                    "- Settings respond more naturally to user changes.\n" ..
+                    "- Text size changes to account for lower resolutions (Future update for more customization on this).",
+                    false, "LEFT")
+
                 local versionSection = NewSection("version-installation",
-                    "Version & Installation", "Current build information for troubleshooting.", true)
+                    "hudcraft Version", "Current build information for troubleshooting.", true)
                 AddCenteredHeader(versionSection, "Installed Build")
                 local installedVersion = C_AddOns.GetAddOnMetadata(addonName, "Version") or "Unknown"
                 AddText(versionSection,
@@ -268,15 +256,11 @@ function addon:CreateSettingsWindow()
                     "When reporting a bug or sharing feedback, include your installed version.",
                     false, "CENTER")
 
-                local commandSection = NewSection("chat-commands", "Chat Commands",
+                local commandSection, commandHeader = NewSection("chat-commands", "Chat Commands",
                     nil, true)
-                AddText(commandSection, table.concat(self.commandHelpLines or {}, "\n"), false, "CENTER")
+                AddText(commandSection, table.concat(self.commandHelpLines or {}, "\n"), false, "LEFT")
 
                 BindHostedPage(ui, host)
-                local recenterUpdate = ui.SettingsPageMeasure:Create(content, RecenterUnderlines, { passes = 4 })
-                scroll:HookScript("OnSizeChanged", recenterUpdate)
-                content:HookScript("OnShow", recenterUpdate)
-                recenterUpdate()
             elseif pageId == "main" and subpageId == "global-styles" then
                 local layout = ui.SettingsLayout
                 local controls = ui.SettingsControls
@@ -452,6 +436,8 @@ function addon:CreateSettingsWindow()
                         value = styles:GetWindowBorderColor(base)
                     elseif key == "interaction" then
                         value = styles:GetWindowInteractionColor(base)
+                    elseif key == "hover" then
+                        value = styles:GetWindowHighlightColor(base)
                     else
                         value = styles:GetMainCanvasColor(base)
                     end
@@ -482,24 +468,21 @@ function addon:CreateSettingsWindow()
                     return true
                 end
 
-                local opacityValues = {}
-                for value = 0, 100 do opacityValues[#opacityValues + 1] = value end
-                local function FormatOpacity(value) return tostring(value) .. "%" end
                 local overrideRows = {
-                    { key = "text", colorLabel = "Group text color", opacityLabel = "Group text opacity" },
-                    { key = "notepadText", colorLabel = "Notepad text color", opacityLabel = "Notepad text opacity" },
-                    { key = "border", colorLabel = "Border color", opacityLabel = "Border opacity" },
-                    { key = "interaction", colorLabel = "Interaction color", opacityLabel = "Interaction opacity" },
-                    { key = "background", colorLabel = "Background color", opacityLabel = "Background opacity" },
+                    { key = "text", colorLabel = "Group text color" },
+                    { key = "notepadText", colorLabel = "Notepad text color" },
+                    { key = "border", colorLabel = "Border color" },
+                    { key = "interaction", colorLabel = "Interaction color" },
+                    { key = "hover", colorLabel = "Hover color" },
+                    { key = "background", colorLabel = "Background color" },
                 }
                 for _, rowDefinition in ipairs(overrideRows) do
                     local row = layout:Row(section,
-                        "hudcraft-group-style-override-" .. rowDefinition.key, { flow = true })
-                    local columns = layout:Columns(row, 2, {
-                        rowDefinition.key .. "-color",
-                        rowDefinition.key .. "-opacity",
-                    })
-                    local colorInput = controls.AddHexColorContent(columns[1], rowDefinition.colorLabel,
+                        "hudcraft-group-style-override-" .. rowDefinition.key, {
+                            flow = true,
+                            padding = 2,
+                        })
+                    local colorInput = controls.AddHexColorContent(row, rowDefinition.colorLabel,
                         function() return GetOverrideColor(rowDefinition.key) end,
                         function(value) return SetOverrideColor(rowDefinition.key, value) end,
                         function() self:ApplyAllGroupAppearances() end,
@@ -508,23 +491,18 @@ function addon:CreateSettingsWindow()
                             set = function(value) return SetOverrideOpacity(rowDefinition.key, value) end,
                         })
                     colorInput.editBox:SetMaxLetters(7)
-                    layout:AddContent(columns[1], colorInput, { role = "color", fillWidth = true })
-
-                    local opacitySlider = controls.AddSteppedSlider(columns[2],
-                        rowDefinition.opacityLabel, opacityValues, 0, 0,
-                        function() return GetOverrideOpacity(rowDefinition.key) end,
-                        function(value) SetOverrideOpacity(rowDefinition.key, value) end,
-                        FormatOpacity)
-                    layout:AddContent(columns[2], opacitySlider, { role = "slider", fillWidth = true })
+                    layout:AddContent(row, colorInput, { role = "color", fillWidth = true })
                 end
 
-                local resetRow = layout:Row(section, "hudcraft-clear-group-overrides-row", { flow = true })
-                local resetColumns = layout:Columns(resetRow, 2, {
+                local resetRow = layout:Row(section, "hudcraft-clear-group-overrides-row", {
+                    flow = true,
+                    padding = 2,
+                })
+                local resetColumns = layout:Columns(resetRow, 1, {
                     "hudcraft-clear-group-overrides-button",
-                    "hudcraft-clear-group-overrides-spacer",
                 }, {
-                    horizontalAlignments = { "CENTER", "CENTER" },
-                    verticalAlignments = { "CENTER", "CENTER" },
+                    horizontalAlignments = { "CENTER" },
+                    verticalAlignments = { "CENTER" },
                 })
                 local clearOverridesButton = controls.AddActionButtonContent(
                     resetColumns[1], "Clear Group Overrides", function()
@@ -648,7 +626,7 @@ function addon:CreateSettingsWindow()
                     local deleteButton = ui.WindowStyles:CreateIconButton(deleteColumn, "exit_icon", function()
                         local current = HUDCraftDB.groups.byId[groupId]
                         if current then StaticPopup_Show("HUDCRAFT_DELETE_GROUP", current.name, nil, groupId) end
-                    end, HUDCraftDB.styles.settings, iconOptions)
+                    end, nil, iconOptions)
                     layout:AddContent(deleteColumn, deleteButton, { role = "button" })
                     if isNotepad then
                         notepadRows[groupId] = row
@@ -799,15 +777,22 @@ function addon:CreateSettingsWindow()
 
                 local entries, selectedGroupId = {}, nil
                 local RefreshGroupManagement
-                local navigation, notepadNavigation, notepadNavigationHeader
+                local navigation, notepadNavigation, groupsNavigationHeader, notepadNavigationHeader
                 local navigationOrderSignature
                 local navigationContentHeight = 0
-                local function ApplySidebarWidthLimit()
+                local function GetSidebarMaximumWidth()
                     local scrollbarGutter = controls.GetScrollbarGutterWidth
                         and controls:GetScrollbarGutterWidth("slim") or 12
                     local dividerClearance = 4
-                    local maximumWidth = math.max(15,
+                    return math.max(15,
                         (window:GetWidth() or 1) * 0.30 - scrollbarGutter - dividerClearance)
+                end
+
+                local function ApplySidebarWidth()
+                    local scrollbarGutter = controls.GetScrollbarGutterWidth
+                        and controls:GetScrollbarGutterWidth("slim") or 12
+                    local dividerClearance = 4
+                    local maximumWidth = GetSidebarMaximumWidth()
                     if navigation then navigation:SetMaxWidth(maximumWidth) end
                     if notepadNavigation then notepadNavigation:SetMaxWidth(maximumWidth) end
                     local sharedWidth = navigation and (navigation:GetWidth() or 15) or 15
@@ -1210,7 +1195,10 @@ function addon:CreateSettingsWindow()
                             current.moduleOrder = order
                             self:RefreshGroup(groupId)
                             if host.ScheduleMeasure then host.ScheduleMeasure() end
-                        end)
+                        end, {
+                            showHeader = false,
+                            topInset = modulePicker.ControlTopInset,
+                        })
                     layout:AddContent(columns[2], orderControl, { role = "control", fillWidth = true })
                     end
 
@@ -1238,6 +1226,10 @@ function addon:CreateSettingsWindow()
                             navigation:Hide()
                             if navigation.host then navigation.host:Hide() end
                         end
+                        if groupsNavigationHeader then
+                            groupsNavigationHeader:Hide()
+                            if groupsNavigationHeader.underline then groupsNavigationHeader.underline:Hide() end
+                        end
                         if notepadNavigation then
                             notepadNavigation:Hide()
                             if notepadNavigation.host then notepadNavigation.host:Hide() end
@@ -1254,12 +1246,49 @@ function addon:CreateSettingsWindow()
                         local contentGap = tonumber(metrics.CONTENT_GAP) or 2
                         local sectionGap = tonumber(metrics.SECTION_GAP) or contentGap
                         local navigationHeight = tonumber(ui.WindowStyles.GeometryDefaults.navigationItemHeight) or 28
+                        local groupHeaderHeight = #groupIds > 0
+                            and (sectionPadding + SIDEBAR_SECTION_TITLE_FONT_SIZE + 4) or 0
                         local groupNavHeight = #groupIds > 0
                             and (sectionPadding * 2 + #groupIds * navigationHeight
                                 + math.max(0, #groupIds - 1) * contentGap) or 0
+                        if #groupIds > 0 then
+                            local header = sidebarScrollContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                            local fontPath, _, fontFlags = header:GetFont()
+                            if fontPath then
+                                header:SetFont(fontPath, SIDEBAR_SECTION_TITLE_FONT_SIZE, fontFlags or "")
+                            end
+                            header:SetJustifyH("LEFT")
+                            header:SetText("Groups")
+                            header:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT",
+                                sectionPadding, -sectionPadding)
+                            EnableSidebarWheel(header)
+                            local function RepaintGroupsNavigationHeader(target)
+                                local color = ui.WindowStyles:GetTextColor("textInteractionAccentColor", content)
+                                if color then target:SetTextColor(unpack(color)) end
+                            end
+                            ui.WindowStyles:RegisterVisual(header, RepaintGroupsNavigationHeader)
+                            RepaintGroupsNavigationHeader(header)
+                            local underline = ui.WindowStyles:CreateFlatTexture(sidebarScrollContent, "BORDER",
+                                ui.WindowStyles:GetTextColor("textNeutralAccentColor", content))
+                            if underline then
+                                underline:SetHeight(2)
+                                underline:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+                                underline:SetWidth(math.max(1, header:GetStringWidth() or 1))
+                                ui.WindowStyles:RegisterVisual(underline, function(target)
+                                    target:SetVertexColor(unpack(ui.WindowStyles:GetTextColor(
+                                        "textNeutralAccentColor", content)))
+                                end)
+                            end
+                            header.underline = underline
+                            groupsNavigationHeader = header
+                        else
+                            groupsNavigationHeader = nil
+                        end
                         local groupNavHost = CreateFrame("Frame", nil, sidebarScrollContent)
-                        groupNavHost:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT", 0, 0)
-                        groupNavHost:SetPoint("TOPRIGHT", sidebarScrollContent, "TOPRIGHT", 0, 0)
+                        groupNavHost:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT", 0,
+                            -(groupHeaderHeight + (groupHeaderHeight > 0 and contentGap or 0)))
+                        groupNavHost:SetPoint("TOPRIGHT", sidebarScrollContent, "TOPRIGHT", 0,
+                            -(groupHeaderHeight + (groupHeaderHeight > 0 and contentGap or 0)))
                         groupNavHost:SetHeight(math.max(1, groupNavHeight))
                         local items = {}
                         for _, groupId in ipairs(groupIds) do
@@ -1270,7 +1299,7 @@ function addon:CreateSettingsWindow()
                         end
                         navigation = ui.NavigationControls:CreateVerticalSubpageNavigation(
                             groupNavHost, items, {
-                                maxWidth = math.max(15, (window:GetWidth() or 1) * 0.30),
+                                maxWidth = GetSidebarMaximumWidth(),
                                 onSelect = function(_, item)
                                     if item then SelectGroup(item.groupId) end
                                 end,
@@ -1281,14 +1310,18 @@ function addon:CreateSettingsWindow()
                         for _, button in ipairs(navigation.buttons or {}) do
                             EnableSidebarWheel(button)
                         end
-                        navigationContentHeight = groupNavHeight
+                        navigationContentHeight = groupHeaderHeight + groupNavHeight
 
                         if #notepadIds > 0 then
                             local header = sidebarScrollContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                            local fontPath, _, fontFlags = header:GetFont()
+                            if fontPath then
+                                header:SetFont(fontPath, SIDEBAR_SECTION_TITLE_FONT_SIZE, fontFlags or "")
+                            end
                             header:SetJustifyH("LEFT")
                             header:SetText("Notepads")
                             header:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT",
-                                sectionPadding, -(groupNavHeight + sectionGap))
+                                sectionPadding, -(groupHeaderHeight + groupNavHeight + sectionGap))
                             EnableSidebarWheel(header)
                             local function RepaintNotepadNavigationHeader(target)
                                 local color = ui.WindowStyles:GetTextColor("textInteractionAccentColor", content)
@@ -1310,15 +1343,16 @@ function addon:CreateSettingsWindow()
                             header.underline = underline
                             notepadNavigationHeader = header
 
-                            local noteHeaderHeight = math.max(header:GetStringHeight() or 12, 12) + 4
+                            local noteHeaderHeight = math.max(header:GetStringHeight() or
+                                SIDEBAR_SECTION_TITLE_FONT_SIZE, SIDEBAR_SECTION_TITLE_FONT_SIZE) + 4
                             local notepadNavigationHeight = sectionPadding * 2
                                 + #notepadIds * navigationHeight
                                 + math.max(0, #notepadIds - 1) * contentGap
                             local noteHost = CreateFrame("Frame", nil, sidebarScrollContent)
                             noteHost:SetPoint("TOPLEFT", sidebarScrollContent, "TOPLEFT", 0,
-                                -(groupNavHeight + sectionGap + noteHeaderHeight + contentGap))
+                                -(groupHeaderHeight + groupNavHeight + sectionGap + noteHeaderHeight + contentGap))
                             noteHost:SetPoint("TOPRIGHT", sidebarScrollContent, "TOPRIGHT", 0,
-                                -(groupNavHeight + sectionGap + noteHeaderHeight + contentGap))
+                                -(groupHeaderHeight + groupNavHeight + sectionGap + noteHeaderHeight + contentGap))
                             noteHost:SetHeight(math.max(1, notepadNavigationHeight))
                             local noteItems = {}
                             for _, groupId in ipairs(notepadIds) do
@@ -1329,7 +1363,7 @@ function addon:CreateSettingsWindow()
                             end
                             notepadNavigation = ui.NavigationControls:CreateVerticalSubpageNavigation(
                                 noteHost, noteItems, {
-                                    maxWidth = math.max(15, (window:GetWidth() or 1) * 0.30),
+                                    maxWidth = GetSidebarMaximumWidth(),
                                     onSelect = function(_, item)
                                         if item then SelectGroup(item.groupId) end
                                     end,
@@ -1340,7 +1374,7 @@ function addon:CreateSettingsWindow()
                             for _, button in ipairs(notepadNavigation.buttons or {}) do
                                 EnableSidebarWheel(button)
                             end
-                            navigationContentHeight = groupNavHeight + sectionGap
+                            navigationContentHeight = groupHeaderHeight + groupNavHeight + sectionGap
                                 + noteHeaderHeight + contentGap + notepadNavigationHeight
                         else
                             notepadNavigation = nil
@@ -1356,7 +1390,7 @@ function addon:CreateSettingsWindow()
                         if sidebarScrollbar and sidebarScrollbar.RefreshVisibility then
                             sidebarScrollbar:RefreshVisibility()
                         end
-                        ApplySidebarWidthLimit()
+                        ApplySidebarWidth()
                         if sidebarDivider then sidebarDivider:SetShown(#groupIds > 0 or #notepadIds > 0) end
                         navigationOrderSignature = signature
                     else
@@ -1366,7 +1400,7 @@ function addon:CreateSettingsWindow()
                         for index, groupId in ipairs(notepadIds) do
                             notepadNavigation:SetLabel(index, self:GetGroupName(groupId))
                         end
-                        ApplySidebarWidthLimit()
+                        ApplySidebarWidth()
                     end
 
                     local selectedIndex
@@ -1651,6 +1685,9 @@ function addon:CreateSettingsWindow()
                                 config.order = order
                                 if orderControl then orderControl:SetValues(selectedOrderForCurrentEntries()) end
                                 self:RefreshAllGroups({ moduleId })
+                                -- Selection changes the ordered-list height. Re-measure
+                                -- this hosted page so the containing Section follows it.
+                                if host.ScheduleMeasure then host.ScheduleMeasure() end
                             end,
                         }
                     end
@@ -1681,7 +1718,10 @@ function addon:CreateSettingsWindow()
                             end
                             config.order = order
                             self:RefreshAllGroups({ moduleId })
-                        end)
+                        end, {
+                            showHeader = false,
+                            topInset = picker.ControlTopInset,
+                        })
                     layout:AddContent(columns[2], orderControl, { role = "control", fillWidth = true })
                     self:RefreshAllGroups({ moduleId })
                     else
@@ -1712,6 +1752,12 @@ function addon:CreateSettingsWindow()
                 height = mainHeight,
                 onClick = function() self:ShowSettingsPage(pageId, defaultSubpageId) end,
             })
+        -- The shared tab's one-unit edge textures need native rounding when
+        -- this consumer's three buttons divide into fractional widths.
+        local pixelUtil = _G.PixelUtil
+        if pixelUtil and type(pixelUtil.SetRoundLayoutToNearestPixelRecursively) == "function" then
+            pixelUtil.SetRoundLayoutToNearestPixelRecursively(mainButtons[pageId], true)
+        end
     end
 
     local navigationLayoutInProgress = false

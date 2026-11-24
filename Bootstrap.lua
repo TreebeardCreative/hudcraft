@@ -1,9 +1,9 @@
 local addonName, addon = ...
 
 addon.name = addonName
-addon.version = "2.1.12"
+addon.version = "2.2.0"
 addon.requiredTreebeardUIAPI = 1
-addon.requiredTreebeardUIVersion = "1.1.5"
+addon.requiredTreebeardUIVersion = "1.2.0"
 
 local function VersionAtLeast(version, required)
     local function ParseVersion(value)

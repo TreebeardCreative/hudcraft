@@ -60,7 +60,7 @@ function addon:GetGroupStylePreset(baseName)
     override.opacity = type(override.opacity) == "table" and override.opacity or {}
 
     local hasOverride = false
-    for _, field in ipairs({ "text", "border", "interaction", "background" }) do
+    for _, field in ipairs({ "text", "border", "interaction", "hover", "background" }) do
         local opacity = tonumber(override.opacity[field])
         if ValidHex(override.colors[field]) or (opacity and opacity ~= 100) then
             hasOverride = true
@@ -110,11 +110,19 @@ function addon:GetGroupStylePreset(baseName)
     preset.colorFactoryFamilies = families
     if hasInteractionOverride then
         -- Use factory tokens even when the source style stores fixed hexes.
-        preset.windowHighlightColor = "interactionAccent_2"
         preset.windowInteractionColor = "interactionAccent_4"
     else
-        preset.windowHighlightColor = baseStyle.windowHighlightColor
         preset.windowInteractionColor = baseStyle.windowInteractionColor
+    end
+    local hoverOpacity = tonumber(override.opacity.hover)
+    local hasHoverOverride = ValidHex(override.colors.hover)
+        or (hoverOpacity and hoverOpacity ~= 100)
+    if hasHoverOverride then
+        local hoverBase = ValidHex(override.colors.hover)
+            and override.colors.hover or styles:GetWindowHighlightColor(baseStyle)
+        preset.windowHighlightColor = CopyRGBA(factory, hoverBase, Opacity(override, "hover"))
+    else
+        preset.windowHighlightColor = styles:GetWindowHighlightColor(baseStyle)
     end
     -- ColorFactory-derived canvas shades now feed both the body and active
     -- frame-header surface while retaining this preset's original geometry.
@@ -123,6 +131,12 @@ function addon:GetGroupStylePreset(baseName)
     local sourceMap = baseStyle.textColorRoleMap or {}
     preset.textColorRoleMap = {}
     for role, slot in pairs(sourceMap) do preset.textColorRoleMap[role] = slot end
+    if hasInteractionOverride then
+        -- Interaction-family edits must not recolor the Group content text
+        -- role when the user has no explicit text override.
+        preset.textInteractionAccentColor = styles:ResolveColor(
+            baseStyle.textInteractionAccentColor, baseStyle)
+    end
 
     -- Keep Group text overrides scoped to HUD content. Window titles,
     -- navigation labels, and control headers retain their style roles.
@@ -132,7 +146,7 @@ function addon:GetGroupStylePreset(baseName)
     if hasTextOverride then
         local value = override.colors.text
         if not ValidHex(value) then
-            value = styles:ResolveColor(baseStyle.textInteractionAccentColor, preset)
+            value = styles:ResolveColor(baseStyle.textInteractionAccentColor, baseStyle)
         end
         preset.groupContentTextColor = CopyRGBA(factory, value, Opacity(override, "text"))
     end

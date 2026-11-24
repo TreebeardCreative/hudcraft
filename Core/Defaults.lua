@@ -2,7 +2,7 @@ local _, addon = ...
 
 addon.Defaults = {
     Account = {
-        version = 5,
+        version = 6,
         general = {
             showGroupName = true,
             spacing = 6,
